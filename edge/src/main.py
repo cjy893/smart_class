@@ -140,7 +140,16 @@ async def main():
     policy = policy_cls()
     behavior_engine = BehaviorEngine(inference_svc)
 
-    scheduler = Scheduler(policy, mqtt, task_mgr, task_repo, behavior_repo)
+    scheduler = Scheduler(
+        policy,
+        mqtt,
+        task_mgr,
+        task_repo,
+        behavior_repo,
+        person_count_repo=pc_repo,
+        attendance_repo=attendance_repo,
+        cloud_offline_timeout_s=config["scheduler"]["cloud_offline_timeout_s"],
+    )
     scheduler.set_engines(face_engine, behavior_engine, face_lib)
     logger.info("Scheduler initialized, policy=%s", config["scheduler"]["policy"])
 
