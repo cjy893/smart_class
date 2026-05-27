@@ -1,0 +1,35 @@
+device_id: "edge-atlas-01"
+mqtt:
+  broker_host: "localhost"
+  broker_port: 1883
+scheduler:
+  policy: "adaptive"                          # greedy_nearby | load_balance | adaptive
+  timeout_person_count_ms: 3000
+  timeout_face_attendance_ms: 15000
+  timeout_behavior_analyze_ms: 30000
+  timeout_report_generate_ms: 30000
+  cloud_offline_timeout_s: 60
+  dedup_window_seconds: 300
+api:
+  host: "0.0.0.0"
+  port: 8000
+grpc:
+  cloud_address: "192.168.1.200:50051"
+  report_interval_seconds: 30
+paths:
+  face_lib: "/mnt/e/edge_compute/edge/data/face_lib"
+  schedule: "/mnt/e/edge_compute/edge/config/schedule.json"
+  sqlite_db: "/mnt/e/edge_compute/edge/data/edge.db"
+  models: "/data/models"
+  mindx_home: "/usr/local/Ascend/mindx_sdk"
+inference:
+  face_detection_model: "/data/models/retinaface.om"
+  face_recognition_model: "/data/models/arcface.om"
+  behavior_model: "/data/models/yolov5m.om"
+  preload_models: true
+  device_id: 0
+device:
+  heartbeat_timeout_seconds: 15
+experiment:
+  simulated_task_count: 100
+  test_images_dir: "/data/benchmark_images"

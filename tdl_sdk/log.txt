@@ -1,0 +1,104 @@
+ Run build_tdl_sdk() function 
+~/duo-buildroot-sdk-v2/tdl_sdk ~/duo-buildroot-sdk-v2
+Using ././build_tdl_sdk.sh all
+Compiling modules and sample...
+Cleanup tmp folder.
+Creating tmp working directory.
+~/duo-buildroot-sdk-v2/tdl_sdk/tmp/build_sdk ~/duo-buildroot-sdk-v2/tdl_sdk
+-- The C compiler identification is GNU 10.2.0
+-- The CXX compiler identification is GNU 10.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-gcc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-g++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+==================================================
+Branch                 main
+Latest tag             unknown-6f8962c39
+Commit                 6f8962c39 Merge branch 'develop'
+
+[Summary]
+Build type             SDKRelease
+C   compiler           /home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-gcc
+CXX compiler           /home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-g++
+C Flags                 -std=gnu11 -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mabi=lp64d -ffunction-sections -fdata-sections -Wno-pointer-to-int-cast -fsigned-char -Wl,-gc-sections -lstdc++ -lm -lpthread -std=gnu11 -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mabi=lp64d -ffunction-sections -fdata-sections -Wno-pointer-to-int-cast -fsigned-char -Wl,-gc-sections -lstdc++ -lm -lpthread -Os -DNDEBUG -fsigned-char -fdiagnostics-color=always -std=gnu11 -s -std=gnu11 -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mabi=lp64d -ffunction-sections -fdata-sections -Wno-pointer-to-int-cast -fsigned-char -Wl,-gc-sections -lstdc++ -lm -lpthread
+CXX Flags               -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mabi=lp64d -fsigned-char -ffunction-sections -fdata-sections -fPIC -Wl,-gc-sections -lm -lpthread -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mabi=lp64d -fsigned-char -ffunction-sections -fdata-sections -fPIC -Wl,-gc-sections -lm -lpthread -Os -DNDEBUG -fsigned-char -fPIC -fdiagnostics-color=always -std=gnu++11 -pthread -s -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mabi=lp64d -fsigned-char -ffunction-sections -fdata-sections -fPIC -Wl,-gc-sections -lm -lpthread
+Install dir            /home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/install
+CMAKE_TOOLCHAIN_FILE   /home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/toolchain/riscv64-unknown-linux-musl.cmake
+Enable Perfetto        
+CVI_PLATFORM           CV181X
+USE_TPU_IVE            OFF
+FTP_SERVER_IP          
+CONFIG_DUAL_OS         OFF
+==================================================
+-- Current Directory: /home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk
+-- Parent Directory: /home/anontokyo/duo-buildroot-sdk-v2
+-- Found MLIR_SDK_ROOT (directory: /home/anontokyo/duo-buildroot-sdk-v2/install/soc_sg2002_milkv_duo256m_musl_riscv64_sd/tpu_musl_riscv64/cvitek_tpu_sdk)
+-- Found MIDDLEWARE_SDK_ROOT (directory: /home/anontokyo/duo-buildroot-sdk-v2/cvi_mpi)
+-- Found Python: /usr/bin/python3.10 (found version "3.10.12") found components: Interpreter 
+-- Looking for pthread.h
+-- Looking for pthread.h - found
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE  
+add cv-utils
+add cvi tdl service
+-- Compile defs contain: __CV181X___MIDDLEWARE_V2_
+-- edge_compute_device: MQTT enabled
+-- edge_compute_device: HTTP server enabled
+-- Configuring done
+-- Generating done
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    TARGET_MACHINE
+    TPU_IVE_SDK_ROOT
+
+
+-- Build files have been written to: /home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/tmp/build_sdk
+[44/548] Building CXX object modules/core/CMakeFiles/cvi_tdl_core.dir/cvi_tdl_core.cpp.o
+/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/modules/core/cvi_tdl_core.cpp: In function 'CVI_S32 CVI_TDL_WordPieceInit(cvitdl_handle_t, const char*)':
+/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/modules/core/cvi_tdl_core.cpp:1379:1: warning: control reaches end of non-void function [-Wreturn-type]
+ 1379 | }
+      | ^
+[360/548] Building C object sample_video/CMakeFiles/sample_vi_pd.dir/sample_vi_pd.c.o
+/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/sample_video/sample_vi_pd.c:97:1: warning: data definition has no type or storage class
+   97 | MUTEXAUTOLOCK_INIT(ResultMutex);
+      | ^~~~~~~~~~~~~~~~~~
+/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/sample_video/sample_vi_pd.c:97:1: warning: type defaults to 'int' in declaration of 'MUTEXAUTOLOCK_INIT' [-Wimplicit-int]
+/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/sample_video/sample_vi_pd.c:97:1: warning: parameter names (without types) in function declaration
+/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/sample_video/sample_vi_pd.c: In function 'main':
+/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/sample_video/sample_vi_pd.c:180:31: warning: passing argument 1 of 'CVI_TDL_APP_DestroyHandle' from incompatible pointer type [-Wincompatible-pointer-types]
+  180 |     CVI_TDL_APP_DestroyHandle(&app_handle);
+      |                               ^~~~~~~~~~~
+      |                               |
+      |                               cvitdl_app_context_t **
+In file included from /home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/sample_video/sample_vi_pd.c:6:
+/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/sample_video/../include/cvi_tdl_app/cvi_tdl_app.h:47:66: note: expected 'cvitdl_app_handle_t' {aka 'cvitdl_app_context_t *'} but argument is of type 'cvitdl_app_context_t **'
+   47 | DLL_EXPORT CVI_S32 CVI_TDL_APP_DestroyHandle(cvitdl_app_handle_t handle);
+      |                                              ~~~~~~~~~~~~~~~~~~~~^~~~~~
+[548/548] Linking CXX executable sample/edge_compute_device/edge_compute_device
+FAILED: sample/edge_compute_device/edge_compute_device 
+: && /home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-g++ -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mabi=lp64d -fsigned-char -ffunction-sections -fdata-sections -fPIC -Wl,-gc-sections -lm -lpthread -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mabi=lp64d -fsigned-char -ffunction-sections -fdata-sections -fPIC -Wl,-gc-sections -lm -lpthread -Os -DNDEBUG -fsigned-char -fPIC -fdiagnostics-color=always -std=gnu++11 -pthread -s -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mabi=lp64d -fsigned-char -ffunction-sections -fdata-sections -fPIC -Wl,-gc-sections -lm -lpthread  sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/edge_compute_device.cpp.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/app.cpp.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/config.cpp.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/task_queue.cpp.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/inference_engine.cpp.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/mqtt_client.cpp.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/http_server.cpp.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/gpio_handler.cpp.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/mmf_pipeline.cpp.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/offline_cache.cpp.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/heartbeat.cpp.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/__/__/sample_video/middleware_utils.c.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/__/__/sample_video/sample_utils.c.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/home/anontokyo/duo-buildroot-sdk-v2/cvi_mpi/sample/common/sample_common_platform.c.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/home/anontokyo/duo-buildroot-sdk-v2/cvi_mpi/sample/common/sample_common_sys.c.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/home/anontokyo/duo-buildroot-sdk-v2/cvi_mpi/sample/common/sample_common_vi.c.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/home/anontokyo/duo-buildroot-sdk-v2/cvi_mpi/sample/common/sample_common_isp.c.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/home/anontokyo/duo-buildroot-sdk-v2/cvi_mpi/sample/common/sample_common_vpss.c.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/home/anontokyo/duo-buildroot-sdk-v2/cvi_mpi/sample/common/sample_common_venc.c.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/home/anontokyo/duo-buildroot-sdk-v2/cvi_mpi/sample/common/sample_common_bin.c.o sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/home/anontokyo/duo-buildroot-sdk-v2/cvi_mpi/sample/common/sample_common_peripheral.c.o -o sample/edge_compute_device/edge_compute_device -L/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/tmp/_deps/paho_mqtt-src/lib   -L/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/tmp/_deps/libmicrohttpd-src/lib   -L/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/install/lib   -L/home/anontokyo/duo-buildroot-sdk-v2/cvi_mpi/lib   -L/home/anontokyo/duo-buildroot-sdk-v2/cvi_mpi/lib/3rd -Wl,-rpath,/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/tmp/_deps/paho_mqtt-src/lib:/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/tmp/_deps/libmicrohttpd-src/lib:/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/install/lib:/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/tmp/build_sdk/modules:/home/anontokyo/duo-buildroot-sdk-v2/tdl_sdk/tmp/_deps/opencv-src/lib:/home/anontokyo/duo-buildroot-sdk-v2/install/soc_sg2002_milkv_duo256m_musl_riscv64_sd/tpu_musl_riscv64/cvitek_tpu_sdk/lib:/home/anontokyo/duo-buildroot-sdk-v2/cvi_mpi/lib:/home/anontokyo/duo-buildroot-sdk-v2/cvi_mpi/lib/3rd:  modules/libcvi_tdl.so  -lpthread  -latomic  -lpaho-mqtt3a  -lmicrohttpd  -lsys  -lvi  -lvo  -lvpss  -lgdc  -lrgn  -lini  -lsns_full  -lsample  -lisp  -lvdec  -lvenc  -lawb  -lae  -laf  -lcvi_bin_isp  -lcvi_bin  /home/anontokyo/duo-buildroot-sdk-v2/install/soc_sg2002_milkv_duo256m_musl_riscv64_sd/tpu_musl_riscv64/cvitek_tpu_sdk/lib/libz.so  -lmisc  -lisp_algo  /home/anontokyo/duo-buildroot-sdk-v2/install/soc_sg2002_milkv_duo256m_musl_riscv64_sd/tpu_musl_riscv64/cvitek_tpu_sdk/lib/libcvikernel.so  /home/anontokyo/duo-buildroot-sdk-v2/install/soc_sg2002_milkv_duo256m_musl_riscv64_sd/tpu_musl_riscv64/cvitek_tpu_sdk/lib/libcvimath.so  /home/anontokyo/duo-buildroot-sdk-v2/install/soc_sg2002_milkv_duo256m_musl_riscv64_sd/tpu_musl_riscv64/cvitek_tpu_sdk/lib/libcviruntime.so  ../_deps/opencv-src/lib/libopencv_core.so  ../_deps/opencv-src/lib/libopencv_core.so.3.2  ../_deps/opencv-src/lib/libopencv_core.so.3.2.0  ../_deps/opencv-src/lib/libopencv_imgcodecs.so  ../_deps/opencv-src/lib/libopencv_imgcodecs.so.3.2  ../_deps/opencv-src/lib/libopencv_imgcodecs.so.3.2.0  ../_deps/opencv-src/lib/libopencv_imgproc.so  ../_deps/opencv-src/lib/libopencv_imgproc.so.3.2  ../_deps/opencv-src/lib/libopencv_imgproc.so.3.2.0  -lcvi_ive   -latomic && :
+/home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/../lib/gcc/riscv64-unknown-linux-musl/10.2.0/../../../../riscv64-unknown-linux-musl/bin/ld: sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/__/__/sample_video/middleware_utils.c.o: in function `.L60':
+middleware_utils.c:(.text.SAMPLE_TDL_Init_WM+0x66e): undefined reference to `CVI_RTSP_Create'
+/home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/../lib/gcc/riscv64-unknown-linux-musl/10.2.0/../../../../riscv64-unknown-linux-musl/bin/ld: middleware_utils.c:(.text.SAMPLE_TDL_Init_WM+0x6ba): undefined reference to `CVI_RTSP_CreateSession'
+/home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/../lib/gcc/riscv64-unknown-linux-musl/10.2.0/../../../../riscv64-unknown-linux-musl/bin/ld: sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/__/__/sample_video/middleware_utils.c.o: in function `.L61':
+middleware_utils.c:(.text.SAMPLE_TDL_Init_WM+0x6f2): undefined reference to `CVI_RTSP_SetListener'
+/home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/../lib/gcc/riscv64-unknown-linux-musl/10.2.0/../../../../riscv64-unknown-linux-musl/bin/ld: middleware_utils.c:(.text.SAMPLE_TDL_Init_WM+0x6fe): undefined reference to `CVI_RTSP_Start'
+/home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/../lib/gcc/riscv64-unknown-linux-musl/10.2.0/../../../../riscv64-unknown-linux-musl/bin/ld: sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/__/__/sample_video/middleware_utils.c.o: in function `.L62':
+middleware_utils.c:(.text.SAMPLE_TDL_Init_WM+0x71e): undefined reference to `CVI_RTSP_DestroySession'
+/home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/../lib/gcc/riscv64-unknown-linux-musl/10.2.0/../../../../riscv64-unknown-linux-musl/bin/ld: middleware_utils.c:(.text.SAMPLE_TDL_Init_WM+0x728): undefined reference to `CVI_RTSP_Destroy'
+/home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/../lib/gcc/riscv64-unknown-linux-musl/10.2.0/../../../../riscv64-unknown-linux-musl/bin/ld: sample/edge_compute_device/CMakeFiles/edge_compute_device.dir/__/__/sample_video/middleware_utils.c.o: in function `SAMPLE_TDL_Destroy_MW':
+middleware_utils.c:(.text.SAMPLE_TDL_Destroy_MW+0x1c): undefined reference to `CVI_RTSP_Stop'
+/home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/../lib/gcc/riscv64-unknown-linux-musl/10.2.0/../../../../riscv64-unknown-linux-musl/bin/ld: middleware_utils.c:(.text.SAMPLE_TDL_Destroy_MW+0x28): undefined reference to `CVI_RTSP_DestroySession'
+/home/anontokyo/duo-buildroot-sdk-v2/host-tools/gcc/riscv64-linux-musl-x86_64/bin/../lib/gcc/riscv64-unknown-linux-musl/10.2.0/../../../../riscv64-unknown-linux-musl/bin/ld: middleware_utils.c:(.text.SAMPLE_TDL_Destroy_MW+0x32): undefined reference to `CVI_RTSP_Destroy'
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
+ build_tdl_sdk() failed !! 
+~/duo-buildroot-sdk-v2
