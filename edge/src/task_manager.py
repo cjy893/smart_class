@@ -29,6 +29,7 @@ class TaskManager:
         self.timeout_ms = timeout_ms or DEFAULT_TIMEOUT_MS
         self.dedup_window = dedup_window_seconds
         self._seen_tasks: dict[str, float] = {}  # task_id → created_timestamp
+        self._payload_cache: dict[str, dict] = {}
         self._running_timeouts: dict[str, asyncio.Task] = {}
         self._local_queue: list[Task] = []
         self._queue_lock = asyncio.Lock()
@@ -42,6 +43,7 @@ class TaskManager:
             return None
 
         self._seen_tasks[task_id] = asyncio.get_event_loop().time()
+        self._payload_cache[task_id] = dict(msg)
 
         timeout_ms = self.timeout_ms.get(msg["task_type"], 30000)
         created_at = msg.get("created_at", datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
@@ -64,10 +66,15 @@ class TaskManager:
     def is_duplicate(self, task_id: str) -> bool:
         return task_id in self._seen_tasks
 
+    def get_payload(self, task_id: str) -> Optional[dict]:
+        payload = self._payload_cache.get(task_id)
+        return dict(payload) if payload is not None else None
+
     async def update_status(self, task_id: str, status: str) -> None:
         await self.task_repo.update(task_id, status=status)
         if status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.REJECTED):
             self._cancel_timeout(task_id)
+            self._payload_cache.pop(task_id, None)
 
     async def handle_result(self, task_id: str, result: dict) -> None:
         """处理执行后返回的结果。"""
@@ -80,6 +87,7 @@ class TaskManager:
             completed_at=completed_at,
         )
         self._cancel_timeout(task_id)
+        self._payload_cache.pop(task_id, None)
 
     async def record_face_attendance(self, task_id: str, session_id: str,
                                      result: dict, metrics: dict) -> None:
@@ -94,6 +102,7 @@ class TaskManager:
             attempt=current + 1,
         )
         self._cancel_timeout(task_id)
+        self._payload_cache.pop(task_id, None)
 
     async def enqueue_local(self, task: Task) -> None:
         """将任务加入边侧本地执行队列。"""
