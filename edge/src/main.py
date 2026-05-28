@@ -68,15 +68,21 @@ async def main():
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
+    # 项目根目录 (edge/)
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config_path = os.path.join(base_dir, "config", "edge_config.yaml")
     config = load_config(config_path)
     logger.info("Config loaded: %s", config_path)
 
-    # --- Step 1: DB ---
-    db_path = os.path.join(base_dir, "data", "edge.db")
+    # 路径：优先用 config 中的绝对路径，否则回退到项目相对路径
+    paths = config.get("paths", {})
+    db_path = paths.get("sqlite_db") or os.path.join(base_dir, "data", "edge.db")
+    schedule_path = paths.get("schedule") or os.path.join(base_dir, "config", "schedule.json")
+    face_lib_path = paths.get("face_lib") or os.path.join(base_dir, "data", "face_lib")
     schema_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                "db", "schema.sql")
+
+    # --- Step 1: DB ---
     db_conn = Connection(db_path, schema_path)
     conn = await db_conn.init()
     logger.info("SQLite initialized: %s", db_path)
@@ -116,7 +122,7 @@ async def main():
         logger.info("Models preloaded via MindX SDK")
 
     # --- Step 5: Face lib ---
-    face_lib = FaceLib(config["paths"]["face_lib"])
+    face_lib = FaceLib(face_lib_path)
     face_engine = FaceEngine(inference_svc)
     await face_lib.init(face_engine)
     logger.info("FaceLib initialized: %d students, %d embeddings",
@@ -206,7 +212,7 @@ async def main():
     logger.info("MQTT subscriptions set up")
 
     # --- Step 9: Schedule loader ---
-    schedule_loader = ScheduleLoader(config["paths"]["schedule"])
+    schedule_loader = ScheduleLoader(schedule_path)
     schedule_loader.load()
 
     schedule_loader.on_class_start(lambda entry: session_mgr.start_session(entry))

@@ -48,14 +48,17 @@ class FaceEngine:
             logger.error("face_detection model not loaded")
             return []
 
-        # 预处理: 解码 JPEG → resize → normalize → Tensor
+        # RetinaFace 预处理: BGR, resize 640x640, mean=[104,117,123]
         import cv2
         img = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
         if img is None:
             return []
         h, w = img.shape[:2]
-        input_blob = cv2.dnn.blobFromImage(img, 1/255.0, (640, 640), (0, 0, 0), swapRB=True)
-        input_blob = np.ascontiguousarray(input_blob).astype(np.float32)
+        img = cv2.resize(img, (640, 640)).astype(np.float32)
+        img -= (104, 117, 123)
+        input_blob = np.ascontiguousarray(
+            img.transpose(2, 0, 1)[np.newaxis, ...]
+        ).astype(np.float32)
 
         from mindx.sdk import Tensor
         input_tensor = Tensor(input_blob)
@@ -86,14 +89,17 @@ class FaceEngine:
             logger.error("face_recognition model not loaded")
             return np.zeros(256, dtype=np.float32)
 
+        # ArcFace 预处理: BGR→RGB, resize 112x112, (x/127.5 - 1.0)
         import cv2
         img = cv2.imdecode(np.frombuffer(face_crop, np.uint8), cv2.IMREAD_COLOR)
         if img is None:
-            return np.zeros(256, dtype=np.float32)
+            return np.zeros(512, dtype=np.float32)
         img = cv2.resize(img, (112, 112))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32)
+        img = (img / 127.5) - 1.0
         input_blob = np.ascontiguousarray(
-            img.transpose(2, 0, 1).astype(np.float32) / 255.0
-        )[np.newaxis, ...]  # (1, 3, 112, 112)
+            img.transpose(2, 0, 1)[np.newaxis, ...]
+        ).astype(np.float32)
 
         from mindx.sdk import Tensor
         input_tensor = Tensor(input_blob)
