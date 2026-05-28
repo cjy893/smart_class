@@ -94,7 +94,7 @@ class Scheduler:
         await self.dispatch(task, target, message)
 
     async def dispatch(self, task: Task, target: str,
-                        message: dict | None = None) -> None:
+                        message: "Optional[dict]" = None) -> None:
         """路由到目标层执行。"""
         device_id = task.device_id
         task_type = TaskType(task.task_type)

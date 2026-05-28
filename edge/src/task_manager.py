@@ -22,7 +22,7 @@ class TaskManager:
     """Task 生命周期管理 + 超时监控 + 幂等去重。"""
 
     def __init__(self, task_repo: TaskRepository, mqtt: MqttClient,
-                 timeout_ms: dict[str, int] | None = None,
+                 timeout_ms: "Optional[dict[str, int]]" = None,
                  dedup_window_seconds: int = 300):
         self.task_repo = task_repo
         self.mqtt = mqtt

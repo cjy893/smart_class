@@ -21,7 +21,7 @@ paths:
   schedule: "/home/HwHiAiUser/edge_compute/edge/config/schedule.json"
   sqlite_db: "/home/HwHiAiUser/edge_compute/edge/data/edge.db"
   models: "/home/HwHiAiUser/edge_compute/edge/models"
-  mindx_home: "/usr/local/Ascend/mxVision"
+  mindx_home: "/home/HwHiAiUser/Ascend/mxVision"
 inference:
   face_detection_model: "/home/HwHiAiUser/edge_compute/edge/models/retinaface.om"
   face_recognition_model: "/home/HwHiAiUser/edge_compute/edge/models/arcface.om"

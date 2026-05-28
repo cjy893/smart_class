@@ -1,0 +1,11 @@
+(base) HwHiAiUser@davinci-mini:~/edge_compute/edge/src$ python main.py
+Traceback (most recent call last):
+  File "/home/HwHiAiUser/edge_compute/edge/src/main.py", line 46, in <module>
+    from scheduler import Scheduler
+  File "/home/HwHiAiUser/edge_compute/edge/src/scheduler.py", line 18, in <module>
+    from task_manager import TaskManager
+  File "/home/HwHiAiUser/edge_compute/edge/src/task_manager.py", line 21, in <module>
+    class TaskManager:
+  File "/home/HwHiAiUser/edge_compute/edge/src/task_manager.py", line 25, in TaskManager
+    timeout_ms: dict[str, int] | None = None,
+TypeError: unsupported operand type(s) for |: 'types.GenericAlias' and 'NoneType'

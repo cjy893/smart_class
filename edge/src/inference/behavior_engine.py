@@ -53,29 +53,58 @@ class BehaviorEngine:
         if img is None:
             return BehaviorResult()
         h, w = img.shape[:2]
+        scale_x, scale_y = w / 640.0, h / 640.0
 
         # 预处理
         input_blob = cv2.dnn.blobFromImage(img, 1/255.0, (640, 640), (0, 0, 0), swapRB=True)
-        input_blob = np.ascontiguousarray(input_blob).astype(np.float32)
+        input_blob = np.ascontiguousarray(input_blob).astype(np.float16)
 
         from mindx.sdk import Tensor
+        from inference.face_engine import _nms
         input_tensor = Tensor(input_blob)
         output = model.infer([input_tensor])[0]
         output.to_host()
-        detections = np.array(output)
+        data = np.array(output).reshape(-1, 85)  # (25200, 85)
 
-        # YOLO 输出格式: [batch, num_detections, (x1,y1,x2,y2,conf,cls)]
+        # 提取 person 检测 + NMS
+        scores = data[:, 4]
+        person_mask = (scores > 0.4) & (data[:, 5].astype(int) == 0)
+        if person_mask.sum() == 0:
+            return BehaviorResult()
+
+        pers = data[person_mask]
+        scores = pers[:, 4]
+        # 自动检测格式: 像素坐标 [x1,y1,x2,y2] 或归一化 [cx,cy,w,h]
+        raw_max = max(pers[:, 0].max(), pers[:, 1].max(), pers[:, 2].max(), pers[:, 3].max())
+        if raw_max <= 640:
+            x1 = np.clip(pers[:, 0], 0, 640); y1 = np.clip(pers[:, 1], 0, 640)
+            x2 = np.clip(pers[:, 2], 0, 640); y2 = np.clip(pers[:, 3], 0, 640)
+        else:
+            cx, cy = pers[:, 0], pers[:, 1]
+            bw, bh = pers[:, 2], pers[:, 3]
+            x1 = np.clip((cx - bw / 2.0) * 640, 0, 640)
+            y1 = np.clip((cy - bh / 2.0) * 640, 0, 640)
+            x2 = np.clip((cx + bw / 2.0) * 640, 0, 640)
+            y2 = np.clip((cy + bh / 2.0) * 640, 0, 640)
+
+        # 过滤掉零面积框
+        valid = (x2 > x1) & (y2 > y1)
+        x1, y1, x2, y2 = x1[valid], y1[valid], x2[valid], y2[valid]
+        scores = scores[valid]
+        if len(scores) == 0:
+            return BehaviorResult()
+
+        indices = _nms(x1, y1, x2, y2, scores, iou_thresh=0.5)
+
+        # 还原到原始图像坐标
         persons = []
-        for det in detections[0]:
-            score = float(det[4])
-            cls = int(det[5])
-            if score < 0.4 or cls != 0:  # COCO class 0 = person
-                continue
-            x1 = max(0, float(det[0]) * w / 640.0)
-            y1 = max(0, float(det[1]) * h / 640.0)
-            x2 = min(w, float(det[2]) * w / 640.0)
-            y2 = min(h, float(det[3]) * h / 640.0)
-            persons.append({"x1": x1, "y1": y1, "x2": x2, "y2": y2})
+        for i in indices:
+            persons.append({
+                "x1": float(x1[i]) * scale_x,
+                "y1": float(y1[i]) * scale_y,
+                "x2": float(x2[i]) * scale_x,
+                "y2": float(y2[i]) * scale_y,
+            })
 
         result = BehaviorResult(total_detected=len(persons))
         avg_height = np.mean([p["y2"] - p["y1"] for p in persons]) if persons else 0
