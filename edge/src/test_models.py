@@ -32,18 +32,20 @@ def init_mindx(mindx_home: str, device_id: int = 0):
 
 def load_model(model_path: str, device_id: int = 0):
     from mindx.sdk import base
-    m = base.Model(modelPath=model_path, deviceID=device_id)
+    m = base.Model(modelPath=model_path, deviceId=device_id)
     print(f"[OK] Loaded: {Path(model_path).name}")
     return m
 
 
 def test_retinaface(model, image_path: str):
-    """RetinaFace: BGR, 640x640, mean=[104,117,123] → 期望输出人脸框"""
+    """RetinaFace: BGR, 640x640, mean=[104,117,123] → PriorBox decode + NMS"""
     from mindx.sdk import Tensor
+    from inference.face_engine import _generate_priors, _nms
 
     img = cv2.imread(image_path)
     assert img is not None, f"Cannot read {image_path}"
     h, w = img.shape[:2]
+    scale_x, scale_y = w / 640.0, h / 640.0
     print(f"  Input: {w}x{h}")
 
     t0 = time.perf_counter()
@@ -51,23 +53,75 @@ def test_retinaface(model, image_path: str):
     inp = cv2.resize(img, (640, 640)).astype(np.float32)
     inp -= (104, 117, 123)
     inp = np.ascontiguousarray(inp.transpose(2, 0, 1)[np.newaxis, ...]).astype(np.float32)
-    # 推理
-    out = model.infer([Tensor(inp)])[0]
-    out.to_host()
-    data = np.array(out)
+    # 推理（三路输出）
+    outputs = model.infer([Tensor(inp)])
+    for o in outputs:
+        o.to_host()
+
+    # 打印所有输出 shape，确定正确的索引映射
+    raw_tensors = [np.array(o) for o in outputs]
+    for i, t in enumerate(raw_tensors):
+        print(f"  output[{i}]: shape={t.shape}")
+
+    # 根据列数确定：4列=bbox, 2列=cls, 10列=landmark
+    bbox_idx = cls_idx = None
+    for i, t in enumerate(raw_tensors):
+        dims = t.shape
+        col = dims[-1] if len(dims) >= 2 else None
+        if col == 4: bbox_idx = i
+        elif col == 2: cls_idx = i
+
+    if bbox_idx is None or cls_idx is None:
+        print(f"  Could not identify outputs (bbox_idx={bbox_idx}, cls_idx={cls_idx})")
+        return False
+
+    cls_raw = raw_tensors[cls_idx].reshape(16800, 2)
+    loc_raw = raw_tensors[bbox_idx].reshape(16800, 4)
+
+    scores_all = cls_raw[:, 1]
+    print(f"  cls score range: [{scores_all.min():.6f}, {scores_all.max():.6f}]")
+    print(f"  cls score>0.5 count (raw): {(scores_all > 0.5).sum()}")
+    print(f"  cls score>0.02 count (raw): {(scores_all > 0.02).sum()}")
+
+    # PriorBox decode
+    priors = _generate_priors(640, 640)
+    variance = [0.1, 0.2]
+    dcx = loc_raw[:, 0] * variance[0] * priors[:, 2] + priors[:, 0]
+    dcy = loc_raw[:, 1] * variance[0] * priors[:, 3] + priors[:, 1]
+    dw = np.exp(loc_raw[:, 2] * variance[1]) * priors[:, 2]
+    dh = np.exp(loc_raw[:, 3] * variance[1]) * priors[:, 3]
+    x1 = dcx - dw / 2.0
+    y1 = dcy - dh / 2.0
+    x2 = dcx + dw / 2.0
+    y2 = dcy + dh / 2.0
+
+    scores = cls_raw[:, 1]
+    keep = scores > 0.02
+    print(f"  After score>0.02: {keep.sum()} candidates")
+    x1, y1, x2, y2 = x1[keep], y1[keep], x2[keep], y2[keep]
+    scores = scores[keep]
+
+    # 归一化坐标 → 像素坐标 (640)
+    x1 *= 640; y1 *= 640; x2 *= 640; y2 *= 640
+    x1 = np.clip(x1, 0, 640); y1 = np.clip(y1, 0, 640)
+    x2 = np.clip(x2, 0, 640); y2 = np.clip(y2, 0, 640)
+    w_box = x2 - x1; h_box = y2 - y1
+    keep_idx = (w_box > 5) & (h_box > 5)
+    x1, y1, x2, y2 = x1[keep_idx], y1[keep_idx], x2[keep_idx], y2[keep_idx]
+    scores = scores[keep_idx]
+    print(f"  After size>5x5 filter: {len(scores)} candidates")
+    print(f"  Max score before NMS: {scores.max():.6f}")
+
+    # NMS
+    indices = _nms(x1, y1, x2, y2, scores, iou_thresh=0.4)
     elapsed = (time.perf_counter() - t0) * 1000
 
-    # 解析输出 (RetinaFace 输出 shape 取决于导出方式)
-    print(f"  Output shape: {data.shape}, dtype: {data.dtype}, time: {elapsed:.1f}ms")
-    print(f"  Output range: [{data.min():.4f}, {data.max():.4f}]")
-
-    # 尝试统计框数
-    det_count = 0
-    for row in data.reshape(-1, data.shape[-1]):
-        score = float(row[4]) if data.shape[-1] >= 5 else float(row[-1])
-        if score > 0.5:
-            det_count += 1
-    print(f"  Detections (score>0.5): {det_count}")
+    print(f"  Output shapes: cls={cls_raw.shape}, loc={loc_raw.shape}, time: {elapsed:.1f}ms")
+    det_count = sum(1 for i in indices if scores[i] >= 0.5)
+    print(f"  Faces detected (score>0.5, after NMS): {det_count}")
+    for i in indices:
+        if scores[i] >= 0.5:
+            print(f"    [{int(x1[i]*scale_x)},{int(y1[i]*scale_y)} {int(x2[i]*scale_x)}x{int(y2[i]*scale_y)}] score={scores[i]:.4f}")
     return det_count > 0
 
 
@@ -118,33 +172,61 @@ def test_arcface(model, image_path: str):
 def test_yolov5m(model, image_path: str):
     """YOLOv5m: RGB, 640x640, /255 → 期望检测到 person (class 0)"""
     from mindx.sdk import Tensor
+    from inference.face_engine import _nms
 
     img = cv2.imread(image_path)
     assert img is not None, f"Cannot read {image_path}"
     h, w = img.shape[:2]
+    scale_x, scale_y = w / 640.0, h / 640.0
 
     t0 = time.perf_counter()
     # 预处理
     inp = cv2.dnn.blobFromImage(img, 1 / 255.0, (640, 640), (0, 0, 0), swapRB=True)
-    inp = np.ascontiguousarray(inp).astype(np.float32)
+    inp = np.ascontiguousarray(inp).astype(np.float16)
     # 推理
     out = model.infer([Tensor(inp)])[0]
     out.to_host()
-    data = np.array(out)
+    data = np.array(out).reshape(-1, 85)  # (25200, 85)
     elapsed = (time.perf_counter() - t0) * 1000
 
-    print(f"  Output shape: {data.shape}, dtype: {data.dtype}, time: {elapsed:.1f}ms")
-    print(f"  Output range: [{data.min():.4f}, {data.max():.4f}]")
+    # 提取 person (class 0) 检测
+    scores = data[:, 4]  # objectness
+    person_mask = scores > 0.4
 
-    # 统计 person 检测数
-    person_count = 0
-    for det in data.reshape(-1, data.shape[-1]):
-        if data.shape[-1] >= 6:
-            score, cls = float(det[4]), int(det[5])
-            if score > 0.4 and cls == 0:
-                person_count += 1
-    print(f"  Persons detected (score>0.4): {person_count}")
-    return person_count > 0
+    if person_mask.sum() == 0:
+        print(f"  Output shape: (1, 25200, 85), dtype: float16, time: {elapsed:.1f}ms")
+        print(f"  Persons detected: 0")
+        return False
+
+    pers = data[person_mask]
+    scores = pers[:, 4]
+
+    # YOLO bbox 可能是 [x1, y1, x2, y2] 像素坐标 或 [cx, cy, w, h] 归一化
+    # 先按像素坐标试：如果值域在 [0, 640] 内则是像素坐标
+    raw_max = max(pers[:, 0].max(), pers[:, 1].max(), pers[:, 2].max(), pers[:, 3].max())
+    print(f"  Bbox coordinate range (raw): [{0:.1f}, {raw_max:.1f}]")
+
+    if raw_max <= 640:
+        # [x1, y1, x2, y2] 已在 640 像素空间
+        x1 = np.clip(pers[:, 0], 0, 640); y1 = np.clip(pers[:, 1], 0, 640)
+        x2 = np.clip(pers[:, 2], 0, 640); y2 = np.clip(pers[:, 3], 0, 640)
+    else:
+        # 归一化 [cx, cy, w, h] → 像素 [x1, y1, x2, y2]
+        cx, cy = pers[:, 0], pers[:, 1]
+        bw, bh = pers[:, 2], pers[:, 3]
+        x1 = np.clip((cx - bw / 2.0) * 640, 0, 640)
+        y1 = np.clip((cy - bh / 2.0) * 640, 0, 640)
+        x2 = np.clip((cx + bw / 2.0) * 640, 0, 640)
+        y2 = np.clip((cy + bh / 2.0) * 640, 0, 640)
+
+    indices = _nms(x1, y1, x2, y2, scores, iou_thresh=0.5)
+
+    print(f"  Output shape: (1, 25200, 85), dtype: float16, time: {elapsed:.1f}ms")
+    print(f"  Raw person candidates: {person_mask.sum()}, after NMS: {len(indices)}")
+    for i in indices:
+        print(f"    [{int(x1[i]*scale_x)},{int(y1[i]*scale_y)} {int(x2[i]*scale_x)}x{int(y2[i]*scale_y)}] score={scores[i]:.4f}")
+
+    return len(indices) > 0
 
 
 def main():

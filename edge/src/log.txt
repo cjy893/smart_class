@@ -1,0 +1,52 @@
+(base) root@davinci-mini:/home/HwHiAiUser/edge_compute/edge/src# python test_models.py
+Begin to initialize Log.
+The output directory of logs file exist.
+WARNING: Logging before InitGoogleLogging() is written to STDERR
+I20260529 03:17:54.436355 73972 FileUtils.cpp:331] The input file is empty
+I20260529 03:17:54.436431 73972 FileUtils.cpp:475] Check Other group permission: Current permission is 4, but required no greater than 0.
+Save logs information to specified directory.
+[OK] MindX SDK initialized, device=0
+[OK] Loaded: retinaface.om
+[OK] Loaded: arcface.om
+[OK] Loaded: yolov5m.om
+
+Test image: /home/HwHiAiUser/edge_compute/edge/data/face_lib/photos/张三.jpg
+
+--- RetinaFace [1,3,640,640] BGR mean-sub ---
+  Input: 3120x4160
+  output[0]: shape=(1, 16800, 4)
+  output[1]: shape=(1, 16800, 2)
+  output[2]: shape=(1, 16800, 10)
+  cls score range: [0.000003, 0.998535]
+  cls score>0.5 count (raw): 107
+  cls score>0.02 count (raw): 167
+  After score>0.02: 167 candidates
+  After size>5x5 filter: 167 candidates
+  Max score before NMS: 0.998535
+  Output shapes: cls=(16800, 2), loc=(16800, 4), time: 116.8ms
+  Faces detected (score>0.5, after NMS): 1
+    [904,955 2420x3479] score=0.9985
+  Result: PASS
+
+--- ArcFace [1,3,112,112] RGB (x/127.5-1) ---
+  Feature dim: 512, time: 10.0ms
+  Feature range: [-1.0430, 0.9336]
+  Self-similarity (L2): 1.000000
+  Result: PASS
+
+--- YOLOv5m [1,3,640,640] RGB /255 ---
+  Bbox coordinate range (raw): [0.0, 636.0]
+  Output shape: (1, 25200, 85), dtype: float16, time: 93.5ms
+  Raw person candidates: 8, after NMS: 3
+    [1523,2370 3017x3558] score=0.8706
+    [793,2808 566x274] score=0.4226
+    [795,2808 556x263] score=0.4023
+  Result: PASS
+
+==================================================
+{
+  "retinaface": "PASS",
+  "arcface": "PASS",
+  "yolov5m": "PASS"
+}
+All models OK.
