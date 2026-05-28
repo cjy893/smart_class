@@ -46,6 +46,7 @@ class Scheduler:
         self._face_engine: Optional["FaceEngine"] = None
         self._behavior_engine: Optional["BehaviorEngine"] = None
         self._face_lib: Optional["FaceLib"] = None
+        self._task_images: dict[str, bytes] = {}  # task_id → image_bytes
 
     def set_engines(self, face_engine: "FaceEngine",
                     behavior_engine: "BehaviorEngine",
@@ -59,6 +60,12 @@ class Scheduler:
         task = await self.task_mgr.create_task(message)
         if task is None:
             return  # 重复任务
+
+        # 保存图像数据供后续本地执行使用
+        image_b64 = message.get("image", "")
+        if image_b64:
+            import base64
+            self._task_images[task.task_id] = base64.b64decode(image_b64)
 
         task_type = TaskType(message["task_type"])
         device_id = message.get("device_id", "")
@@ -84,9 +91,10 @@ class Scheduler:
         else:
             target = "edge"
 
-        await self.dispatch(task, target)
+        await self.dispatch(task, target, message)
 
-    async def dispatch(self, task: Task, target: str) -> None:
+    async def dispatch(self, task: Task, target: str,
+                        message: dict | None = None) -> None:
         """路由到目标层执行。"""
         device_id = task.device_id
         task_type = TaskType(task.task_type)
@@ -94,7 +102,6 @@ class Scheduler:
         await self.task_repo.update(task.task_id, target_layer=target)
 
         if target == "device":
-            # person_count 透传，端侧自闭环
             await self.task_mgr.update_status(task.task_id, TaskStatus.COMPLETED)
 
         elif target == "edge":
@@ -102,7 +109,20 @@ class Scheduler:
             await self._execute_local(task)
 
         elif target == "cloud":
-            payload = await self._build_cloud_request(task)
+            # 转发到云，保留原始消息中的 image
+            image_b64 = ""
+            if message and message.get("image"):
+                image_b64 = message["image"]
+            payload = {
+                "task_id": task.task_id,
+                "task_type": task.task_type,
+                "trigger_source": task.trigger_source,
+                "session_id": task.session_id,
+                "device_id": task.device_id,
+                "created_at": task.created_at,
+                "image": image_b64,
+                "params": {},
+            }
             await self.mqtt.publish(
                 f"cloud/task/request/{device_id}",
                 json.dumps(payload),
@@ -132,11 +152,11 @@ class Scheduler:
             return
 
         t0 = time.perf_counter()
-        task_record = await self.task_repo.get(task.task_id)
-        if not task_record:
+        image_bytes = self._task_images.pop(task.task_id, b"")
+        if not image_bytes:
+            logger.error("No image data for task %s", task.task_id)
+            await self.task_mgr.update_status(task.task_id, TaskStatus.FAILED)
             return
-
-        image_bytes = self._decode_cached_image(task.task_id)
         result = await self._face_engine.recognize(image_bytes, self._face_lib)
         t1 = time.perf_counter()
 
@@ -198,7 +218,11 @@ class Scheduler:
             return
 
         t0 = time.perf_counter()
-        image_bytes = self._decode_cached_image(task.task_id)
+        image_bytes = self._task_images.pop(task.task_id, b"")
+        if not image_bytes:
+            logger.error("No image data for task %s", task.task_id)
+            await self.task_mgr.update_status(task.task_id, TaskStatus.FAILED)
+            return
         result = await self._behavior_engine.analyze(image_bytes)
         t1 = time.perf_counter()
 
