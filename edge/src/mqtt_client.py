@@ -20,6 +20,7 @@ class MqttClient:
         self.client_id = client_id
         self.client = mqtt.Client(client_id=client_id, protocol=mqtt.MQTTv311)
         self._handlers: dict[str, MessageHandler] = {}
+        self._subscriptions: dict[str, int] = {}
         self._connected = False
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
@@ -45,7 +46,7 @@ class MqttClient:
         self._connected = (rc == 0)
         if rc == 0:
             logger.info("MQTT connected to %s:%d", self.broker_host, self.broker_port)
-            for topic, qos in self._pending_subscriptions:
+            for topic, qos in self._subscriptions.items():
                 self.client.subscribe(topic, qos)
         else:
             logger.error("MQTT connect failed, rc=%d", rc)
@@ -57,18 +58,15 @@ class MqttClient:
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
         payload = msg.payload.decode("utf-8", errors="replace")
-        handler = self._handlers.get(topic)
-        if handler and self._loop:
-            asyncio.run_coroutine_threadsafe(handler(topic, payload), self._loop)
-
-    _pending_subscriptions: list[tuple[str, int]] = []
+        for pattern, handler in self._handlers.items():
+            if _topic_matches(pattern, topic) and self._loop:
+                asyncio.run_coroutine_threadsafe(handler(topic, payload), self._loop)
 
     async def subscribe(self, topic: str, qos: int, handler: MessageHandler) -> None:
         self._handlers[topic] = handler
+        self._subscriptions[topic] = qos
         if self._connected:
             await self._loop.run_in_executor(None, lambda: self.client.subscribe(topic, qos))
-        else:
-            self._pending_subscriptions.append((topic, qos))
 
     async def publish(self, topic: str, payload: str, qos: int = 0) -> None:
         if not self._connected:
@@ -82,3 +80,9 @@ class MqttClient:
         self.client.loop_stop()
         await self._loop.run_in_executor(None, self.client.disconnect)
         self._connected = False
+
+
+def _topic_matches(pattern: str, topic: str) -> bool:
+    if pattern.endswith("/#"):
+        return topic.startswith(pattern[:-1])
+    return pattern == topic
