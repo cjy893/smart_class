@@ -1,11 +1,13 @@
 # 端侧代码待完成项
 
+> 基于 2026-06-04 更新。实际代码路径 `tdl_sdk/sample/edge_compute_device/`。
+
 ## 已确认可工作
 
 - MMF 管线 (VI+ISP+VPSS) 初始化与清理
 - YOLOv8n 模型加载与 person_count 推理
 - MQTT raw socket 实现（去除 paho.mqtt.c 依赖，避免 musl 线程兼容性问题）
-- MQTT 全部 topic 收发（8 个 topic，含 LWT，QoS 0/1）
+- MQTT 全部 topic 收发（9 个 topic，含 LWT + edge offline，QoS 0/1）
 - MQTT 断连降级（进入 OFFLINE 状态，person_count 本地缓存）
 - MQTT 非阻塞 init（连接失败不退出，进入 OFFLINE，HTTP 照常启动）
 - MQTT 自动重连（run() 主循环 5s 间隔后台重试，重连成功 flush 离线缓存 + 重订阅）
@@ -17,62 +19,54 @@
 - 状态机全部 6 个状态及转换日志
 - Ctrl+C 信号处理与干净退出（无 segfault，MMF 资源正确释放）
 - Milk-V ↔ Atlas USB RNDIS 网络（静态 IP + 持久化 ARP + mosquitto 匿名访问）
+- JPEG 编码 + base64（OpenCV cv::imencode，参照 cvi_kit CVI_TDL_SavePicture 模式）
+- Edge 离线检测 + DEGRADED 降级
+- GPIO 按键启动 + 无硬件时的 30s 定时模拟测试
+- 开机自启动 (device/src/auto.sh → /mnt/data/auto.sh, S99user 自动调用)
 
 ---
 
-## 待完成项
+## 已修复
 
-### P0 — 阻塞端到端链路
+### P0-1. 任务请求图像是假数据 ✓
 
-#### 1. 任务请求图像是假数据
+**文件**: `app.cpp`
 
-**文件**: `app.cpp:trigger_face_attendance()`, `trigger_behavior_analyze()`
+**修复内容**:
+- 新增 `encode_frame_to_jpeg()` — CVI_SYS_Mmap → cv::merge BGR planar → cv::imencode 内存 JPEG
+- 新增 `base64_encode()` — 标准 base64 编码器
+- `trigger_face_attendance()` 和 `trigger_behavior_analyze()` 改为真实 JPEG + base64
 
-当前代码发送 `{"w":768,"h":432}` 元数据 JSON，非真实图片。边侧推理收不到有效图像，签到/行为分析无法工作。
-
-**修复**: 从 VPSS 帧提取图像数据并做 base64 编码。短期可用软件 JPEG 编码（stb_image_write 或 libjpeg-turbo），长期用 IVE 硬件编码。
-
----
-
-#### 2. GPIO 按键未启动
+### P0-2. GPIO 按键未启动 ✓
 
 **文件**: `app.cpp:init_modules()`
 
-`gpio_->start()` 从未被调用。物理按键完全不工作（Web UI 按钮可暂代）。
+**修复内容**:
+- 在 `init_modules()` 末尾添加 `gpio_->start()`
 
-**修复**: 在 `init_modules()` 末尾添加 `gpio_->start()`。
+### P0-3. Edge 离线检测未实现 ✓
 
----
+**文件**: `app.cpp:setup_mqtt_subscriptions()`
 
-### P1 — 核心功能完善
+**修复内容**:
+- 新增订阅 `edge/device/offline/{device_id}` (QoS 1)，收到后触发 `on_edge_offline()` → DEGRADED 降级
 
-#### 3. 截图是 JPEG（非 JSON）
+### P1-3. 截图是 JSON 非 JPEG ✓
 
 **文件**: `app.cpp:capture_screenshot_jpeg()`
 
-Web UI `<img src="/api/screenshot">` 收到 `{"width":768,"height":432}` 而非 JPEG 二进制。影响端侧 Web 实时画面显示。
-
-**修复**: VPSS 帧 → JPEG 编码。
-
----
-
-#### 4. Edge 离线检测未实现
-
-**文件**: `app.cpp:run()`
-
-`on_edge_offline()` / `on_edge_online()` 已定义但无触发机制。边侧断连时端侧不会自动降级。
-
-**修复**: 订阅 `edge/device/offline/{edge_id}` LWT topic，收到后进入 DEGRADED。
+**修复内容**:
+- 改为调用 `encode_frame_to_jpeg()`，与 P0-1 共用同一 JPEG 编码方案
 
 ---
 
-### P2 — 精度与细节
+## P2 — 精度与细节
 
-| # | 项 | 说明 |
-|---|---|---|
-| 5 | 心跳负载值硬编码 | CPU 45.0 / NPU 30.0 / 内存 128 写死，需读 `/proc/stat`、`/proc/meminfo` |
-| 6 | 心跳 status 字段 | 硬编码 `"online"`，DEGRADED 状态时仍报 online |
-| 7 | GET / 不返回 Web 页面 | 返回 `"text/html placeholder"` 而非 `web/index.html` |
+| # | 项 | 代码位置 | 说明 |
+|---|---|---|---|
+| 5 | 心跳负载值硬编码 | `app.cpp:75-77` lambda 返回 `45.0, 30.0, 128` | 需读 `/proc/stat`、`/proc/meminfo` |
+| 6 | 心跳 status 硬编码 | `heartbeat.cpp:86` 写死 `"online"` | DEGRADED 时仍报 online |
+| 7 | GET / 不返回 Web 页面 | `http_server.cpp:145` 返回 `"text/html placeholder"` | 需读 `web/index.html` 文件并返回 |
 
 ---
 
