@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import threading
 from typing import Awaitable, Callable, Optional
 
 try:
@@ -27,10 +28,12 @@ class MqttClient:
         self._subscriptions: dict[str, int] = {}
         self._connected = False
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._loop_thread_id: Optional[int] = None
 
     async def connect(self) -> None:
         self._loop = asyncio.get_running_loop()
-        await self._loop.run_in_executor(None, self._sync_connect)
+        self._loop_thread_id = threading.get_ident()
+        self._sync_connect()
 
     def _sync_connect(self) -> None:
         self.client.connect_async(self.broker_host, self.broker_port, keepalive=30)
@@ -39,19 +42,20 @@ class MqttClient:
     async def subscribe(self, topic: str, qos: int, handler: MessageHandler) -> None:
         self._handlers[topic] = handler
         self._subscriptions[topic] = qos
+        if self._loop and self._loop.is_running() and self._loop_thread_id is None:
+            self._loop_thread_id = threading.get_ident()
         if self._connected and self._loop:
-            await self._loop.run_in_executor(None, lambda: self.client.subscribe(topic, qos))
+            self.client.subscribe(topic, qos)
 
     async def publish(self, topic: str, payload: str, qos: int = 0) -> None:
         if not self._connected or not self._loop:
             logger.warning("MQTT publish skipped while offline: %s", topic)
             return
-        await self._loop.run_in_executor(None, lambda: self.client.publish(topic, payload, qos=qos))
+        self.client.publish(topic, payload, qos=qos)
 
     async def disconnect(self) -> None:
         self.client.loop_stop()
-        if self._loop:
-            await self._loop.run_in_executor(None, self.client.disconnect)
+        self.client.disconnect()
         self._connected = False
 
     def _on_connect(self, client, userdata, flags, rc):
@@ -69,7 +73,18 @@ class MqttClient:
         payload = msg.payload.decode("utf-8", errors="replace")
         for pattern, handler in self._handlers.items():
             if _topic_matches(pattern, msg.topic) and self._loop:
-                asyncio.run_coroutine_threadsafe(handler(msg.topic, payload), self._loop)
+                self._schedule_handler(handler, msg.topic, payload)
+
+    def _schedule_handler(self, handler: MessageHandler, topic: str, payload: str) -> None:
+        if not self._loop or self._loop.is_closed():
+            return
+        if self._loop_thread_id == threading.get_ident():
+            self._loop.create_task(handler(topic, payload))
+            return
+        self._loop.call_soon_threadsafe(
+            self._loop.create_task,
+            handler(topic, payload),
+        )
 
 
 def _topic_matches(pattern: str, topic: str) -> bool:

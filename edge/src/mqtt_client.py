@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import threading
 from typing import Optional, Callable, Awaitable
 
 import paho.mqtt.client as mqtt
@@ -11,8 +12,7 @@ MessageHandler = Callable[[str, str], Awaitable[None]]
 
 
 class MqttClient:
-    """paho-mqtt async wrapper. 单线程 asyncio 集成，通过 loop.run_in_executor
-       将同步 paho 回调桥接到 async handler。"""
+    """paho-mqtt async wrapper. 通过 paho 网络线程桥接到 async handler。"""
 
     def __init__(self, broker_host: str, broker_port: int, client_id: str):
         self.broker_host = broker_host
@@ -23,6 +23,7 @@ class MqttClient:
         self._subscriptions: dict[str, int] = {}
         self._connected = False
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._loop_thread_id: Optional[int] = None
 
     @property
     def is_connected(self) -> bool:
@@ -30,13 +31,14 @@ class MqttClient:
 
     async def connect(self, lwt_topic: str = "", lwt_payload: str = "") -> None:
         self._loop = asyncio.get_running_loop()
+        self._loop_thread_id = threading.get_ident()
         if lwt_topic:
             self.client.will_set(lwt_topic, lwt_payload, qos=1, retain=True)
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
         self.client.on_message = self._on_message
 
-        await self._loop.run_in_executor(None, self._sync_connect)
+        self._sync_connect()
 
     def _sync_connect(self):
         self.client.connect(self.broker_host, self.broker_port, keepalive=30)
@@ -60,25 +62,36 @@ class MqttClient:
         payload = msg.payload.decode("utf-8", errors="replace")
         for pattern, handler in self._handlers.items():
             if _topic_matches(pattern, topic) and self._loop:
-                asyncio.run_coroutine_threadsafe(handler(topic, payload), self._loop)
+                self._schedule_handler(handler, topic, payload)
+
+    def _schedule_handler(self, handler: MessageHandler, topic: str, payload: str) -> None:
+        if not self._loop or self._loop.is_closed():
+            return
+        if self._loop_thread_id == threading.get_ident():
+            self._loop.create_task(handler(topic, payload))
+            return
+        self._loop.call_soon_threadsafe(
+            self._loop.create_task,
+            handler(topic, payload),
+        )
 
     async def subscribe(self, topic: str, qos: int, handler: MessageHandler) -> None:
         self._handlers[topic] = handler
         self._subscriptions[topic] = qos
+        if self._loop and self._loop.is_running() and self._loop_thread_id is None:
+            self._loop_thread_id = threading.get_ident()
         if self._connected:
-            await self._loop.run_in_executor(None, lambda: self.client.subscribe(topic, qos))
+            self.client.subscribe(topic, qos)
 
     async def publish(self, topic: str, payload: str, qos: int = 0) -> None:
         if not self._connected:
             logger.warning("MQTT publish skipped (offline): %s", topic)
             return
-        await self._loop.run_in_executor(
-            None, lambda: self.client.publish(topic, payload, qos=qos)
-        )
+        self.client.publish(topic, payload, qos=qos)
 
     async def disconnect(self) -> None:
         self.client.loop_stop()
-        await self._loop.run_in_executor(None, self.client.disconnect)
+        self.client.disconnect()
         self._connected = False
 
 

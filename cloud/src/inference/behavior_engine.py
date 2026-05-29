@@ -1,4 +1,3 @@
-import asyncio
 import base64
 from typing import Any
 
@@ -70,7 +69,7 @@ class BehaviorEngine:
         return await self.analyze(image_bytes, params)
 
     async def analyze(self, image_bytes: bytes, params: dict[str, Any] | None = None) -> dict[str, int]:
-        return await asyncio.to_thread(self._sync_analyze, image_bytes)
+        return self._sync_analyze(image_bytes)
 
     def _sync_analyze(self, image_bytes: bytes) -> dict[str, int]:
         image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
