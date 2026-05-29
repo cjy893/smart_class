@@ -19,9 +19,9 @@ from task_manager import TaskManager
 
 logger = logging.getLogger(__name__)
 
-HARD_CONSTRAINT_DEVICE = {TaskType.PERSON_COUNT}
 HARD_CONSTRAINT_EDGE = {TaskType.FACE_ATTENDANCE}
 HARD_CONSTRAINT_CLOUD = {TaskType.REPORT_GENERATE}
+HARD_CONSTRAINT_POLICY = {TaskType.BEHAVIOR_ANALYZE}
 
 
 class Scheduler:
@@ -70,10 +70,8 @@ class Scheduler:
         task_type = TaskType(message["task_type"])
         device_id = message.get("device_id", "")
 
-        # 硬约束路由
-        if task_type in HARD_CONSTRAINT_DEVICE:
-            target = "device"
-        elif task_type in HARD_CONSTRAINT_EDGE:
+        # 路由: 硬约束 > 策略决策
+        if task_type in HARD_CONSTRAINT_EDGE:
             target = "edge"
         elif task_type in HARD_CONSTRAINT_CLOUD:
             target = "cloud"
@@ -83,11 +81,8 @@ class Scheduler:
                                         TaskStatus.REJECTED, {}, {},
                                         error="cloud offline")
                 return
-        elif task_type == TaskType.BEHAVIOR_ANALYZE:
-            if not self._cloud_online:
-                target = "edge"
-            else:
-                target = self.policy.decide(task, self.context)
+        elif task_type in HARD_CONSTRAINT_POLICY:
+            target = "edge" if not self._cloud_online else self.policy.decide(task, self.context)
         else:
             target = "edge"
 
@@ -101,12 +96,9 @@ class Scheduler:
 
         await self.task_repo.update(task.task_id, target_layer=target)
 
-        if target == "device":
-            await self.task_mgr.update_status(task.task_id, TaskStatus.COMPLETED)
-
-        elif target == "edge":
+        if target == "edge":
             await self.task_mgr.enqueue_local(task)
-            await self._execute_local(task)
+            # 不在此处执行 - 由 main.py periodic_checks 异步消费队列
 
         elif target == "cloud":
             # 转发到云，保留原始消息中的 image

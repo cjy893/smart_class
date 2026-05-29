@@ -1,15 +1,15 @@
 cloud_id: "cloud-main"
 mqtt:
-  broker_host: "192.168.1.100"
+  broker_host: "192.168.137.2"
   broker_port: 1883
 grpc:
   listen_address: "0.0.0.0:50051"
 paths:
-  models: "/data/models"
-  reports: "/data/reports"
+  models: "/mnt/e/edge_compute/cloud/models"
+  reports: "/mnt/e/edge_compute/cloud/reports"
 behavior:
   use_rule_engine: true
-  model_path: "/data/models/yolov5m.onnx"
+  model_path: "/mnt/e/edge_compute/cloud/models/yolov5m.onnx"
 status_report:
   interval_seconds: 30
 http:
