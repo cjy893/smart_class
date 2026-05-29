@@ -23,29 +23,21 @@ bool App::init(const std::string& config_path) {
     setup_http_callbacks();
     setup_gpio_callbacks();
 
-    // Try MQTT — failure is non-fatal. App starts in OFFLINE and retries.
     if (connect_mqtt()) {
         setup_mqtt_subscriptions();
+        publish_online();
         set_state(DeviceState::ONLINE);
-        uint64_t now_ms = unix_ms();
-        std::ostringstream oss;
-        oss << "{\"device_id\":\"" << config_.device_id << "\","
-            << "\"timestamp\":" << now_ms << ","
-            << "\"status\":\"online\"}";
-        mqtt_->publish("edge/device/online/" + config_.device_id, oss.str(), 1);
     } else {
-        std::cerr << "[App] MQTT unavailable, starting in offline mode" << std::endl;
         set_state(DeviceState::OFFLINE);
-        http_->set_network_status("offline");
-        http_->set_error_message("网络连接已断开，等待重连...");
+        std::cout << "[App] MQTT unavailable, starting in offline mode" << std::endl;
     }
 
-    // Start background services.
+    // Start background services (HTTP always starts regardless of MQTT state).
     heartbeat_->start();
     http_->start(config_.web_server.port);
 
-    last_reconnect_attempt_ = std::chrono::steady_clock::now();
     running_ = true;
+    last_reconnect_attempt_ = std::chrono::steady_clock::now();
     std::cout << "[App] Initialization complete, entering main loop" << std::endl;
     return true;
 }
@@ -102,39 +94,13 @@ bool App::connect_mqtt() {
                           config_.mqtt.keepalive_seconds);
 }
 
-void App::try_reconnect_mqtt() {
-    std::cout << "[App] Attempting MQTT reconnection..." << std::endl;
-
-    // Clean up any previous (failed) connection state.
-    mqtt_->disconnect();
-
-    if (!connect_mqtt()) {
-        std::cerr << "[App] Reconnection failed, will retry in "
-                  << reconnect_interval_seconds_ << "s" << std::endl;
-        return;
-    }
-
-    setup_mqtt_subscriptions();
-
-    // Flush offline cache.
-    auto records = offline_cache_->read_all();
-    for (const auto& rec : records) {
-        mqtt_->publish("edge/status/person_count/" + config_.device_id, rec, 0);
-    }
-    offline_cache_->clear();
-
-    // Publish online announcement.
+void App::publish_online() {
     uint64_t now_ms = unix_ms();
     std::ostringstream oss;
     oss << "{\"device_id\":\"" << config_.device_id << "\","
         << "\"timestamp\":" << now_ms << ","
         << "\"status\":\"online\"}";
     mqtt_->publish("edge/device/online/" + config_.device_id, oss.str(), 1);
-
-    set_state(DeviceState::ONLINE);
-    http_->set_network_status("online");
-    http_->set_error_message("");
-    std::cout << "[App] MQTT reconnection successful." << std::endl;
 }
 
 void App::setup_mqtt_subscriptions() {
@@ -174,14 +140,12 @@ void App::setup_gpio_callbacks() {
 void App::run() {
     last_person_count_time_ = std::chrono::steady_clock::now();
     last_screenshot_time_ = std::chrono::steady_clock::now();
-    last_reconnect_attempt_ = std::chrono::steady_clock::now();
 
     while (running_) {
         auto now = std::chrono::steady_clock::now();
 
-        // Person count loop (runs even when offline — local inference only).
-        if (state_ == DeviceState::ACTIVE || state_ == DeviceState::DEGRADED ||
-            (state_ == DeviceState::OFFLINE && !current_session_id_.empty())) {
+        // Person count loop (only during active session).
+        if (state_ == DeviceState::ACTIVE) {
             auto elapsed_pc = std::chrono::duration_cast<std::chrono::seconds>(
                 now - last_person_count_time_).count();
             if (elapsed_pc >= config_.person_count.interval_seconds) {
@@ -191,7 +155,8 @@ void App::run() {
         }
 
         // Screenshot loop.
-        if (state_ != DeviceState::INIT && state_ != DeviceState::CONNECTING) {
+        if (state_ == DeviceState::ACTIVE || state_ == DeviceState::IDLE ||
+            state_ == DeviceState::DEGRADED) {
             auto elapsed_ss = std::chrono::duration_cast<std::chrono::seconds>(
                 now - last_screenshot_time_).count();
             if (elapsed_ss >= config_.camera.screenshot_interval_seconds) {
@@ -200,20 +165,31 @@ void App::run() {
             }
         }
 
-        // MQTT reconnection when offline.
-        if (state_ == DeviceState::OFFLINE) {
-            auto elapsed_rc = std::chrono::duration_cast<std::chrono::seconds>(
-                now - last_reconnect_attempt_).count();
-            if (elapsed_rc >= reconnect_interval_seconds_) {
-                try_reconnect_mqtt();
-                last_reconnect_attempt_ = now;
-            }
+        // Connection monitoring: detect loss → go offline.
+        if (!mqtt_->is_connected() && state_ != DeviceState::OFFLINE &&
+            state_ != DeviceState::CONNECTING) {
+            on_network_offline();
         }
 
-        // Connection lost detection.
-        if (!mqtt_->is_connected() && state_ != DeviceState::OFFLINE &&
-            state_ != DeviceState::INIT && state_ != DeviceState::CONNECTING) {
-            on_network_offline();
+        // Background reconnection: when offline, periodically retry (non-blocking).
+        if (state_ == DeviceState::OFFLINE || state_ == DeviceState::CONNECTING) {
+            auto elapsed_reconn = std::chrono::duration_cast<std::chrono::seconds>(
+                now - last_reconnect_attempt_).count();
+            if (!mqtt_->is_connected() && elapsed_reconn >= reconnect_interval_sec_) {
+                std::cout << "[App] Attempting MQTT reconnection..." << std::endl;
+                last_reconnect_attempt_ = now;
+                if (connect_mqtt()) {
+                    setup_mqtt_subscriptions();
+                    std::cout << "[App] Reconnection successful" << std::endl;
+                    on_network_online();
+                } else {
+                    std::cout << "[App] Reconnection failed, will retry in "
+                              << reconnect_interval_sec_ << "s" << std::endl;
+                    if (state_ == DeviceState::CONNECTING) {
+                        set_state(DeviceState::OFFLINE);
+                    }
+                }
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));

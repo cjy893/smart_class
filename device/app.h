@@ -56,6 +56,8 @@ private:
     // Timers.
     std::chrono::steady_clock::time_point last_person_count_time_;
     std::chrono::steady_clock::time_point last_screenshot_time_;
+    std::chrono::steady_clock::time_point last_reconnect_attempt_;
+    static constexpr int reconnect_interval_sec_ = 5;
 
     // Current state.
     std::string current_session_id_;
@@ -71,6 +73,7 @@ private:
     // --- Initialization steps ---
     bool init_modules();
     bool connect_mqtt();
+    void publish_online();
     void setup_mqtt_subscriptions();
     void setup_http_callbacks();
     void setup_gpio_callbacks();

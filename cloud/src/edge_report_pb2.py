@@ -63,14 +63,13 @@ def _field(message, name, number, field_type):
 
 
 _register_file()
-_factory = message_factory.MessageFactory(DESCRIPTOR)
 
-StatusReport = _factory.GetPrototype(
+StatusReport = message_factory.GetMessageClass(
     DESCRIPTOR.FindMessageTypeByName("smart_class.cloud.StatusReport")
 )
-HeartbeatRequest = _factory.GetPrototype(
+HeartbeatRequest = message_factory.GetMessageClass(
     DESCRIPTOR.FindMessageTypeByName("smart_class.cloud.HeartbeatRequest")
 )
-Ack = _factory.GetPrototype(
+Ack = message_factory.GetMessageClass(
     DESCRIPTOR.FindMessageTypeByName("smart_class.cloud.Ack")
 )

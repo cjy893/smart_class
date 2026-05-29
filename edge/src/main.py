@@ -162,9 +162,8 @@ async def main():
     # --- Step 8: MQTT subscriptions ---
     async def on_task_request(topic: str, payload: str):
         msg = json.loads(payload)
-        device_id = msg.get("device_id", "")
-        # person_count 走独立 topic，不经过这里
         task_type = msg.get("task_type", "")
+        # person_count 是推送数据流，走独立 topic，不经过调度引擎
         if task_type == "person_count":
             return
         await scheduler.handle_task_request(msg)
@@ -216,20 +215,38 @@ async def main():
     schedule_loader.load()
 
     schedule_loader.on_class_start(lambda entry: session_mgr.start_session(entry))
-    schedule_loader.on_class_end(lambda entry: None)  # end_session 由课表下课触发
+    async def on_class_end(entry: dict):
+        device = config["device_id"]
+        s = await session_repo.get_active(device)
+        if s:
+            await session_mgr.end_session(s.session_id)
+            # 下课触发报告生成
+            report_msg = {
+                "task_id": f"report_{s.session_id}",
+                "task_type": "report_generate",
+                "trigger_source": "system_timer",
+                "session_id": s.session_id,
+                "device_id": device,
+                "created_at": entry.get("end_time", ""),
+                "image": "",
+            }
+            await scheduler.handle_task_request(report_msg)
+            logger.info("Session ended: %s, report task created", s.session_id)
+
+    schedule_loader.on_class_end(on_class_end)
 
     async def periodic_checks():
-        """定时任务：检查课表下课、云端离线检测、本地队列消费。"""
+        """定时任务：本地队列异步消费、云端离线检测。"""
         while True:
-            # 本地队列消费
+            # 本地队列串行消费
             task = await task_mgr.dequeue_local()
             if task:
-                await scheduler.dispatch(task, "edge")
+                asyncio.create_task(scheduler._execute_local(task))
 
             # 云端离线检测
             await scheduler.check_cloud_offline()
 
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.1)
 
     asyncio.create_task(schedule_loader.start())
     asyncio.create_task(periodic_checks())
