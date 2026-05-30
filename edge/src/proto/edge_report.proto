@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package smart_class.cloud;
+
+service EdgeReport {
+  rpc ReportStatus(StatusReport) returns (Ack);
+  rpc Heartbeat(HeartbeatRequest) returns (Ack);
+}
+
+message StatusReport {
+  string edge_id = 1;
+  double cpu_percent = 2;
+  double npu_percent = 3;
+  double memory_mb = 4;
+  int32 task_queue_depth = 5;
+  int32 connected_devices = 6;
+  string timestamp = 7;
+}
+
+message HeartbeatRequest {
+  string edge_id = 1;
+  string timestamp = 2;
+}
+
+message Ack {
+  bool ok = 1;
+}
