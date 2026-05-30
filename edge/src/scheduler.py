@@ -101,20 +101,7 @@ class Scheduler:
             # 不在此处执行 - 由 main.py periodic_checks 异步消费队列
 
         elif target == "cloud":
-            # 转发到云，保留原始消息中的 image
-            image_b64 = ""
-            if message and message.get("image"):
-                image_b64 = message["image"]
-            payload = {
-                "task_id": task.task_id,
-                "task_type": task.task_type,
-                "trigger_source": task.trigger_source,
-                "session_id": task.session_id,
-                "device_id": task.device_id,
-                "created_at": task.created_at,
-                "image": image_b64,
-                "params": {},
-            }
+            payload = await self._build_cloud_request(task)
             await self.mqtt.publish(
                 f"cloud/task/request/{device_id}",
                 json.dumps(payload),

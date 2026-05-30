@@ -203,11 +203,17 @@ async def main():
                 qos=1,
             )
 
+    async def on_device_offline(topic: str, payload: str):
+        msg = json.loads(payload)
+        device_id = msg.get("device_id", "")
+        logger.warning("Device offline: %s (possible abnormal disconnect)", device_id)
+
     await mqtt.subscribe("edge/task/request/#", 1, on_task_request)
     await mqtt.subscribe("cloud/task/result/#", 1, on_cloud_result)
     await mqtt.subscribe("cloud/status/report", 0, on_cloud_status)
     await mqtt.subscribe("edge/status/person_count/#", 0, on_person_count)
     await mqtt.subscribe("edge/device/online/#", 1, on_device_online)
+    await mqtt.subscribe("edge/device/offline/#", 1, on_device_offline)
     logger.info("MQTT subscriptions set up")
 
     # --- Step 9: Schedule loader ---
