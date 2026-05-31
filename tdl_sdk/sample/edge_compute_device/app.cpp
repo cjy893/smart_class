@@ -243,6 +243,7 @@ void App::on_task_result(const std::string& topic, const std::string& payload) {
 }
 
 void App::on_schedule_command(const std::string& topic, const std::string& payload) {
+    std::cout << "[App] schedule_command arrived: topic=" << topic << " payload=" << payload.substr(0, 80) << std::endl;
     if (payload.find("\"session_restore\"") != std::string::npos) {
         size_t sid_pos = payload.find("\"session_id\"");
         if (sid_pos != std::string::npos) {

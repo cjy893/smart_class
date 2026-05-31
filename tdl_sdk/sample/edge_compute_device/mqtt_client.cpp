@@ -54,6 +54,8 @@ bool MqttClient::connect(const std::string& broker_host, int broker_port,
                           const std::string& client_id, const std::string& lwt_topic,
                           const std::string& lwt_payload, int keepalive_seconds) {
     if (connected_) disconnect();
+    // 确保上次 recv 线程已完全退出（兼容掉线后 recv_running_ 未清零的情况）
+    stop_loop();
 
     keepalive_sec_ = keepalive_seconds;
     stop_requested_ = false;
@@ -121,7 +123,7 @@ bool MqttClient::connect(const std::string& broker_host, int broker_port,
     // Shift payload if remaining-length encoding is longer than 1 byte
     if (rl_pos > vh_start + 1) {
         size_t shift = rl_pos - (vh_start + 1);
-        memmove(pkt + vh_start + shift, pkt + vh_start + 1, pos - (vh_start + 1));
+        memmove(pkt + rl_pos, pkt + vh_start + 1, pos - (vh_start + 1));
         pos += shift;
     }
 
@@ -140,6 +142,7 @@ bool MqttClient::connect(const std::string& broker_host, int broker_port,
 
     connected_ = true;
     last_send_time_ = std::chrono::steady_clock::now();
+    start_loop();
     std::cout << "[MqttClient] Connected to tcp://" << broker_host << ":" << broker_port << std::endl;
     return true;
 }
@@ -175,13 +178,20 @@ bool MqttClient::publish(const std::string& topic, const std::string& payload, i
     unsigned char pkt[2048];
     size_t pos = 0;
 
+    // Header
     unsigned char header = MQTT_PUBLISH;
     if (qos > 0) header |= (qos << 1);
     pkt[pos++] = header;
 
-    size_t rl_pos = pos++;
+    // Remaining length: write first, then data follows
+    uint32_t data_len = 2 + topic.size() + (qos > 0 ? 2 : 0) + payload.size();
+    unsigned char rl_buf[4];
+    size_t rl_len = 0;
+    encode_remaining_length(rl_buf, rl_len, data_len);
+    for (size_t i = 0; i < rl_len; i++) pkt[pos++] = rl_buf[i];
+
+    // Topic + packet ID + payload
     encode_string(pkt, pos, topic);
-    // QoS > 0: 2-byte packet identifier
     if (qos > 0) {
         static uint16_t packet_id = 0;
         packet_id++;
@@ -191,21 +201,15 @@ bool MqttClient::publish(const std::string& topic, const std::string& payload, i
     memcpy(pkt + pos, payload.data(), payload.size());
     pos += payload.size();
 
-    // Fill remaining length
-    uint32_t rem_len = pos - rl_pos - 1;
-    size_t rl2 = rl_pos;
-    encode_remaining_length(pkt, rl2, rem_len);
-    if (rl2 > rl_pos + 1) {
-        size_t shift = rl2 - (rl_pos + 1);
-        memmove(pkt + rl_pos + shift, pkt + rl_pos + 1, pos - (rl_pos + 1));
-        pos += shift;
-    }
-
+    std::cout << "[MqttClient] publish sent topic=" << topic << " len=" << payload.size() << std::endl;
     return send_packet(pkt, pos) == 0;
 }
 
 bool MqttClient::subscribe(const std::string& topic, int qos, MessageCallback callback) {
-    if (!connected_ || sock_fd_ < 0) return false;
+    if (!connected_ || sock_fd_ < 0) {
+        std::cerr << "[MqttClient] subscribe FAILED: connected=" << connected_ << " fd=" << sock_fd_ << std::endl;
+        return false;
+    }
 
     {
         std::lock_guard<std::mutex> lock(callback_mutex_);
@@ -217,25 +221,27 @@ bool MqttClient::subscribe(const std::string& topic, int qos, MessageCallback ca
     size_t pos = 0;
 
     pkt[pos++] = MQTT_SUBSCRIBE;
-    size_t rl_pos = pos++;
+
+    // Remaining length first
+    uint32_t data_len = 2 + 2 + topic.size() + 1;  // packetID(2) + topicLen(2) + topic + qos(1)
+    unsigned char rl_buf[4];
+    size_t rl_len = 0;
+    encode_remaining_length(rl_buf, rl_len, data_len);
+    for (size_t i = 0; i < rl_len; i++) pkt[pos++] = rl_buf[i];
+
     pkt[pos++] = 0x00;  // packet ID MSB
     pkt[pos++] = 0x01;  // packet ID LSB
     encode_string(pkt, pos, topic);
     pkt[pos++] = static_cast<unsigned char>(qos);  // requested QoS
 
-    uint32_t rem_len = pos - rl_pos - 1;
-    size_t rl2 = rl_pos;
-    encode_remaining_length(pkt, rl2, rem_len);
-    if (rl2 > rl_pos + 1) {
-        size_t shift = rl2 - (rl_pos + 1);
-        memmove(pkt + rl_pos + shift, pkt + rl_pos + 1, pos - (rl_pos + 1));
-        pos += shift;
-    }
-
-    return send_packet(pkt, pos) == 0;
+    bool ok = send_packet(pkt, pos) == 0;
+    std::cout << "[MqttClient] subscribe " << (ok ? "OK" : "FAIL")
+              << " topic=" << topic << " qos=" << qos << std::endl;
+    return ok;
 }
 
 void MqttClient::start_loop() {
+    if (recv_running_) return;
     recv_running_ = true;
     recv_thread_ = std::thread(&MqttClient::recv_loop, this);
 }
@@ -262,6 +268,7 @@ void MqttClient::disconnect() {
 // ─── Receive loop (background thread) ───────────────────────────────
 
 void MqttClient::recv_loop() {
+    std::cout << "[MqttClient] recv_loop started fd=" << sock_fd_ << std::endl;
     unsigned char buf[2048];
     unsigned char type_buf;
 
@@ -281,8 +288,15 @@ void MqttClient::recv_loop() {
                 unsigned char ping[] = {MQTT_PINGREQ, 0x00};
                 send_packet(ping, 2);
             }
+            if (ret < 0) {
+                std::cerr << "[MqttClient] select error: " << errno << std::endl;
+                connected_ = false;
+                break;
+            }
             continue;
         }
+
+        std::cout << "[MqttClient] select returned " << ret << " fd=" << sock_fd_ << std::endl;
 
         // Read packet type
         ssize_t n = recv(sock_fd_, &type_buf, 1, MSG_PEEK);
@@ -294,38 +308,50 @@ void MqttClient::recv_loop() {
             continue;
         }
 
-        // Read full packet: fixed header (2-5 bytes) + remaining data
-        unsigned char header[5];
-        int header_len = 0;
+        // Read fixed header: control byte + remaining length (1-4 bytes)
+        unsigned char ctrl;
+        n = recv(sock_fd_, &ctrl, 1, 0);
+        if (n <= 0) {
+            std::cerr << "[MqttClient] ctrl recv err: n=" << n << " errno=" << errno << std::endl;
+            connected_ = false; break;
+        }
+
+        uint32_t rem_len = 0;
+        int multiplier = 1;
+        int rl_bytes = 0;
+        unsigned char rl_byte;
         do {
-            n = recv(sock_fd_, header + header_len, 1, 0);
-            if (n <= 0) { connected_ = false; break; }
-            header_len++;
-        } while ((header[header_len - 1] & 0x80) && header_len < 5);
+            n = recv(sock_fd_, &rl_byte, 1, 0);
+            if (n <= 0) {
+                std::cerr << "[MqttClient] rl recv err: n=" << n << " errno=" << errno << std::endl;
+                connected_ = false; break;
+            }
+            rem_len += (rl_byte & 0x7F) * multiplier;
+            multiplier *= 128;
+            rl_bytes++;
+        } while ((rl_byte & 0x80) && rl_bytes < 4);
 
         if (!connected_) break;
 
-        // Parse remaining length
-        uint32_t rem_len = 0;
-        int multiplier = 1;
-        for (int i = 1; i < header_len; i++) {
-            rem_len += (header[i] & 0x7F) * multiplier;
-            multiplier *= 128;
-        }
+        std::cout << "[MqttClient] packet type=0x" << std::hex << (int)(ctrl & 0xF0)
+                  << std::dec << " rem_len=" << rem_len << std::endl;
 
         // Read remaining data
         size_t total = 0;
         while (total < rem_len) {
             ssize_t chunk = recv(sock_fd_, buf + total, rem_len - total, 0);
-            if (chunk <= 0) { connected_ = false; break; }
+            if (chunk <= 0) {
+                std::cerr << "[MqttClient] body recv err: chunk=" << chunk << " errno=" << errno << std::endl;
+                connected_ = false; break;
+            }
             total += chunk;
         }
         if (!connected_) break;
 
         // Dispatch
-        unsigned char pkt_type = header[0] & 0xF0;
+        unsigned char pkt_type = ctrl & 0xF0;
         if (pkt_type == MQTT_PINGRESP) {
-            // ignore
+            std::cout << "[MqttClient] recv PINGRESP" << std::endl;
         } else if (pkt_type == MQTT_PUBLISH) {
             // Parse topic
             if (total < 2) continue;
@@ -338,6 +364,8 @@ void MqttClient::recv_loop() {
                 payload.assign(reinterpret_cast<char*>(buf + payload_offset),
                               total - payload_offset);
             }
+            std::cout << "[MqttClient] recv PUBLISH topic=" << topic
+                      << " len=" << payload.size() << std::endl;
             handle_message(topic, payload);
         }
         // SUBACK, CONNACK — ignore in recv loop

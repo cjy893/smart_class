@@ -14,7 +14,7 @@ api:
   host: "0.0.0.0"
   port: 8000
 grpc:
-  cloud_address: "192.168.137.2:50051"
+  cloud_address: "192.168.137.1:50051"
   report_interval_seconds: 30
 paths:
   face_lib: "/home/HwHiAiUser/edge_compute/edge/data/face_lib"
