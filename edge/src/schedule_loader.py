@@ -55,8 +55,8 @@ class ScheduleLoader:
     async def start(self) -> None:
         """每分钟检查一次，触发 class_start / class_end 回调。"""
         self._running = True
-        # 初始化时标记当前已在上课中的 session（防止重启后重复触发 start）
-        self._init_active_sessions()
+        # 初始化时：标记活跃 session 并触发 class_start（支持边侧重启恢复）
+        await self._init_active_sessions()
         logger.info("ScheduleLoader started, active sessions: %d", len(self._active_sessions))
         while self._running:
             await self._tick()
@@ -65,7 +65,8 @@ class ScheduleLoader:
     def stop(self) -> None:
         self._running = False
 
-    def _init_active_sessions(self) -> None:
+    async def _init_active_sessions(self) -> None:
+        """初始化时：如果当前在课表时间范围内，标记 session 并触发 class_start 回调。"""
         now = datetime.now()
         today_weekday = now.isoweekday()
         current_time = now.strftime("%H:%M")
@@ -74,7 +75,11 @@ class ScheduleLoader:
                 continue
             if entry["start_time"] <= current_time < entry["end_time"]:
                 sid = self._make_session_id(entry)
-                self._active_sessions.add(sid)
+                if sid not in self._active_sessions:
+                    self._active_sessions.add(sid)
+                    logger.info("Recovered active class: %s", sid)
+                    if self._on_class_start:
+                        await self._on_class_start(entry)
 
     def _make_session_id(self, entry: dict) -> str:
         date_str = datetime.now().strftime("%Y-%m-%d")

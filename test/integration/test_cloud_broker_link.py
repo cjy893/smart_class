@@ -117,7 +117,7 @@ def _client_id(prefix):
 
 def _find_free_port():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
+        sock.bind(("192.168.137.2", 0))
         return sock.getsockname()[1]
 
 
@@ -196,12 +196,12 @@ def broker_endpoint(mqtt_runtime, tmp_path_factory):
 
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     try:
-        if not _wait_for_tcp("127.0.0.1", port):
+        if not _wait_for_tcp("192.168.137.2", port):
             output = ""
             if process.poll() is not None and process.stdout:
                 output = process.stdout.read()
             pytest.skip(f"mosquitto did not start for integration tests: {output}")
-        yield "127.0.0.1", port
+        yield "192.168.137.2", port
     finally:
         process.terminate()
         try:
@@ -216,7 +216,7 @@ def _amqtt_config(port):
         listeners:
           default:
             type: tcp
-            bind: 127.0.0.1:{port}
+            bind: 192.168.137.2:{port}
         plugins:
           amqtt.plugins.authentication.AnonymousAuthPlugin:
             allow_anonymous: true

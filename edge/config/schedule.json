@@ -8,6 +8,15 @@
       "teacher": "张老师",
       "class_name": "三年二班",
       "device_id": "classroom-301"
+    },
+    {
+      "day_of_week": 7,
+      "start_time": "21:00",
+      "end_time": "23:00",
+      "course_name": "数学",
+      "teacher": "张老师",
+      "class_name": "三年二班",
+      "device_id": "classroom-301"
     }
   ]
 }

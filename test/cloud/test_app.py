@@ -92,7 +92,7 @@ def run(coro):
 def config():
     return CloudConfig(
         cloud_id="cloud-main",
-        mqtt=MqttConfig("127.0.0.1", 1883),
+        mqtt=MqttConfig("192.168.137.2", 1883),
         grpc=GrpcConfig("0.0.0.0:50051"),
         paths=PathsConfig("/tmp/models", "/tmp/reports"),
         behavior=BehaviorConfig(True, "/tmp/models/yolov5m.onnx"),
