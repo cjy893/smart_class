@@ -19,9 +19,9 @@ from task_manager import TaskManager
 
 logger = logging.getLogger(__name__)
 
-HARD_CONSTRAINT_DEVICE = {TaskType.PERSON_COUNT}
 HARD_CONSTRAINT_EDGE = {TaskType.FACE_ATTENDANCE}
 HARD_CONSTRAINT_CLOUD = {TaskType.REPORT_GENERATE}
+HARD_CONSTRAINT_POLICY = {TaskType.BEHAVIOR_ANALYZE}
 
 
 class Scheduler:
@@ -46,6 +46,7 @@ class Scheduler:
         self._face_engine: Optional["FaceEngine"] = None
         self._behavior_engine: Optional["BehaviorEngine"] = None
         self._face_lib: Optional["FaceLib"] = None
+        self._task_images: dict[str, bytes] = {}  # task_id → image_bytes
 
     def set_engines(self, face_engine: "FaceEngine",
                     behavior_engine: "BehaviorEngine",
@@ -60,13 +61,17 @@ class Scheduler:
         if task is None:
             return  # 重复任务
 
+        # 保存图像数据供后续本地执行使用
+        image_b64 = message.get("image", "")
+        if image_b64:
+            import base64
+            self._task_images[task.task_id] = base64.b64decode(image_b64)
+
         task_type = TaskType(message["task_type"])
         device_id = message.get("device_id", "")
 
-        # 硬约束路由
-        if task_type in HARD_CONSTRAINT_DEVICE:
-            target = "device"
-        elif task_type in HARD_CONSTRAINT_EDGE:
+        # 路由: 硬约束 > 策略决策
+        if task_type in HARD_CONSTRAINT_EDGE:
             target = "edge"
         elif task_type in HARD_CONSTRAINT_CLOUD:
             target = "cloud"
@@ -76,30 +81,24 @@ class Scheduler:
                                         TaskStatus.REJECTED, {}, {},
                                         error="cloud offline")
                 return
-        elif task_type == TaskType.BEHAVIOR_ANALYZE:
-            if not self._cloud_online:
-                target = "edge"
-            else:
-                target = self.policy.decide(task, self.context)
+        elif task_type in HARD_CONSTRAINT_POLICY:
+            target = "edge" if not self._cloud_online else self.policy.decide(task, self.context)
         else:
             target = "edge"
 
-        await self.dispatch(task, target)
+        await self.dispatch(task, target, message)
 
-    async def dispatch(self, task: Task, target: str) -> None:
+    async def dispatch(self, task: Task, target: str,
+                        message: "Optional[dict]" = None) -> None:
         """路由到目标层执行。"""
         device_id = task.device_id
         task_type = TaskType(task.task_type)
 
         await self.task_repo.update(task.task_id, target_layer=target)
 
-        if target == "device":
-            # person_count 透传，端侧自闭环
-            await self.task_mgr.update_status(task.task_id, TaskStatus.COMPLETED)
-
-        elif target == "edge":
+        if target == "edge":
             await self.task_mgr.enqueue_local(task)
-            await self._execute_local(task)
+            # 不在此处执行 - 由 main.py periodic_checks 异步消费队列
 
         elif target == "cloud":
             payload = await self._build_cloud_request(task)
@@ -132,11 +131,11 @@ class Scheduler:
             return
 
         t0 = time.perf_counter()
-        task_record = await self.task_repo.get(task.task_id)
-        if not task_record:
+        image_bytes = self._task_images.pop(task.task_id, b"")
+        if not image_bytes:
+            logger.error("No image data for task %s", task.task_id)
+            await self.task_mgr.update_status(task.task_id, TaskStatus.FAILED)
             return
-
-        image_bytes = self._decode_cached_image(task.task_id)
         result = await self._face_engine.recognize(image_bytes, self._face_lib)
         t1 = time.perf_counter()
 
@@ -198,7 +197,11 @@ class Scheduler:
             return
 
         t0 = time.perf_counter()
-        image_bytes = self._decode_cached_image(task.task_id)
+        image_bytes = self._task_images.pop(task.task_id, b"")
+        if not image_bytes:
+            logger.error("No image data for task %s", task.task_id)
+            await self.task_mgr.update_status(task.task_id, TaskStatus.FAILED)
+            return
         result = await self._behavior_engine.analyze(image_bytes)
         t1 = time.perf_counter()
 

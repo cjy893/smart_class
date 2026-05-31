@@ -23,28 +23,21 @@ bool App::init(const std::string& config_path) {
     setup_http_callbacks();
     setup_gpio_callbacks();
 
-    if (!connect_mqtt()) {
-        std::cerr << "[App] MQTT connection failed" << std::endl;
-        return false;
+    if (connect_mqtt()) {
+        setup_mqtt_subscriptions();
+        publish_online();
+        set_state(DeviceState::ONLINE);
+    } else {
+        set_state(DeviceState::OFFLINE);
+        std::cout << "[App] MQTT unavailable, starting in offline mode" << std::endl;
     }
 
-    setup_mqtt_subscriptions();
-
-    set_state(DeviceState::ONLINE);
-
-    // Publish online announcement.
-    uint64_t now_ms = unix_ms();
-    std::ostringstream oss;
-    oss << "{\"device_id\":\"" << config_.device_id << "\","
-        << "\"timestamp\":" << now_ms << ","
-        << "\"status\":\"online\"}";
-    mqtt_->publish("edge/device/online/" + config_.device_id, oss.str(), 1);
-
-    // Start background services.
+    // Start background services (HTTP always starts regardless of MQTT state).
     heartbeat_->start();
     http_->start(config_.web_server.port);
 
     running_ = true;
+    last_reconnect_attempt_ = std::chrono::steady_clock::now();
     std::cout << "[App] Initialization complete, entering main loop" << std::endl;
     return true;
 }
@@ -99,6 +92,15 @@ bool App::connect_mqtt() {
     return mqtt_->connect(config_.mqtt.broker_host, config_.mqtt.broker_port,
                           config_.mqtt.client_id, lwt_topic, lwt_payload,
                           config_.mqtt.keepalive_seconds);
+}
+
+void App::publish_online() {
+    uint64_t now_ms = unix_ms();
+    std::ostringstream oss;
+    oss << "{\"device_id\":\"" << config_.device_id << "\","
+        << "\"timestamp\":" << now_ms << ","
+        << "\"status\":\"online\"}";
+    mqtt_->publish("edge/device/online/" + config_.device_id, oss.str(), 1);
 }
 
 void App::setup_mqtt_subscriptions() {
@@ -163,12 +165,31 @@ void App::run() {
             }
         }
 
-        // Connection monitoring.
-        if (!mqtt_->is_connected() && state_ != DeviceState::OFFLINE) {
+        // Connection monitoring: detect loss → go offline.
+        if (!mqtt_->is_connected() && state_ != DeviceState::OFFLINE &&
+            state_ != DeviceState::CONNECTING) {
             on_network_offline();
         }
-        if (mqtt_->is_connected() && state_ == DeviceState::OFFLINE) {
-            on_network_online();
+
+        // Background reconnection: when offline, periodically retry (non-blocking).
+        if (state_ == DeviceState::OFFLINE || state_ == DeviceState::CONNECTING) {
+            auto elapsed_reconn = std::chrono::duration_cast<std::chrono::seconds>(
+                now - last_reconnect_attempt_).count();
+            if (!mqtt_->is_connected() && elapsed_reconn >= reconnect_interval_sec_) {
+                std::cout << "[App] Attempting MQTT reconnection..." << std::endl;
+                last_reconnect_attempt_ = now;
+                if (connect_mqtt()) {
+                    setup_mqtt_subscriptions();
+                    std::cout << "[App] Reconnection successful" << std::endl;
+                    on_network_online();
+                } else {
+                    std::cout << "[App] Reconnection failed, will retry in "
+                              << reconnect_interval_sec_ << "s" << std::endl;
+                    if (state_ == DeviceState::CONNECTING) {
+                        set_state(DeviceState::OFFLINE);
+                    }
+                }
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));

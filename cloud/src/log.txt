@@ -1,0 +1,20 @@
+(myenv) anontokyo@SKY-20240816EVR:/mnt/e/edge_compute/cloud/src$ python main.py
+Traceback (most recent call last):
+  File "/mnt/e/edge_compute/cloud/src/main.py", line 35, in <module>
+    asyncio.run(main())
+  File "/home/anontokyo/miniconda3/envs/myenv/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/home/anontokyo/miniconda3/envs/myenv/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anontokyo/miniconda3/envs/myenv/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/mnt/e/edge_compute/cloud/src/main.py", line 27, in main
+    await app.start()
+  File "/mnt/e/edge_compute/cloud/src/app.py", line 71, in start
+    await self.mqtt.connect()
+  File "/mnt/e/edge_compute/cloud/src/mqtt_client.py", line 33, in connect
+    await self._loop.run_in_executor(None, self._sync_connect)
+TimeoutError: timed out

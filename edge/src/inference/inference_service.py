@@ -53,7 +53,7 @@ class InferenceService:
             if not os.path.exists(path):
                 logger.warning("Model not found: %s=%s", name, path)
                 continue
-            model = base.Model(modelPath=path, deviceID=self.device_id)
+            model = base.Model(modelPath=path, deviceId=self.device_id)
             self._models[name] = model
             logger.info("Model loaded: %s → %s", name, path)
 

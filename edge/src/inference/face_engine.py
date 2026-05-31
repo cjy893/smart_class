@@ -48,31 +48,82 @@ class FaceEngine:
             logger.error("face_detection model not loaded")
             return []
 
-        # 预处理: 解码 JPEG → resize → normalize → Tensor
+        # RetinaFace 预处理: BGR, resize 640x640, mean=[104,117,123]
         import cv2
         img = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
         if img is None:
             return []
         h, w = img.shape[:2]
-        input_blob = cv2.dnn.blobFromImage(img, 1/255.0, (640, 640), (0, 0, 0), swapRB=True)
-        input_blob = np.ascontiguousarray(input_blob).astype(np.float32)
+        scale_x, scale_y = w / 640.0, h / 640.0
+        inp = cv2.resize(img, (640, 640)).astype(np.float32)
+        inp -= (104, 117, 123)
+        input_blob = np.ascontiguousarray(
+            inp.transpose(2, 0, 1)[np.newaxis, ...]
+        ).astype(np.float32)
 
         from mindx.sdk import Tensor
-        input_tensor = Tensor(input_blob)
-        output = model.infer([input_tensor])[0]
-        output.to_host()
-        detections = np.array(output)
+        outputs = model.infer([Tensor(input_blob)])
+        for o in outputs:
+            o.to_host()
 
+        loc_raw = np.array(outputs[0]).reshape(16800, 4)
+        # outputs[1] = landmark (1,16800,10), 暂不用
+        cls_raw = np.array(outputs[1]).reshape(16800, 2)
+
+        # --- PriorBox decode ---
+        priors = _generate_priors(640, 640)
+        variance = [0.1, 0.2]
+
+        prior_cx = priors[:, 0]
+        prior_cy = priors[:, 1]
+        prior_w = priors[:, 2]
+        prior_h = priors[:, 3]
+
+        dcx = loc_raw[:, 0] * variance[0] * prior_w + prior_cx
+        dcy = loc_raw[:, 1] * variance[0] * prior_h + prior_cy
+        dw = np.exp(loc_raw[:, 2] * variance[1]) * prior_w
+        dh = np.exp(loc_raw[:, 3] * variance[1]) * prior_h
+
+        x1 = dcx - dw / 2.0
+        y1 = dcy - dh / 2.0
+        x2 = dcx + dw / 2.0
+        y2 = dcy + dh / 2.0
+
+        scores = cls_raw[:, 1]  # face class score
+        keep = scores > 0.02    # 宽松预筛选，NMS 后精筛
+
+        x1, y1, x2, y2 = x1[keep], y1[keep], x2[keep], y2[keep]
+        scores = scores[keep]
+
+        # 归一化坐标 → 像素坐标 (640) → 裁剪
+        x1 = np.clip(x1 * 640, 0, 640)
+        y1 = np.clip(y1 * 640, 0, 640)
+        x2 = np.clip(x2 * 640, 0, 640)
+        y2 = np.clip(y2 * 640, 0, 640)
+
+        w_box = x2 - x1
+        h_box = y2 - y1
+        keep_idx = (w_box > 5) & (h_box > 5)
+        x1, y1, x2, y2 = x1[keep_idx], y1[keep_idx], x2[keep_idx], y2[keep_idx]
+        scores = scores[keep_idx]
+
+        # NMS
+        indices = _nms(x1, y1, x2, y2, scores, iou_thresh=0.4)
+        x1, y1, x2, y2 = x1[indices], y1[indices], x2[indices], y2[indices]
+        scores = scores[indices]
+
+        # 还原到原始图像坐标
         boxes = []
-        for det in detections[0]:
-            score = float(det[4])
-            if score < 0.5:
+        for i in range(len(scores)):
+            if scores[i] < 0.5:
                 continue
-            x1 = float(det[0]) * w / 640.0
-            y1 = float(det[1]) * h / 640.0
-            x2 = float(det[2]) * w / 640.0
-            y2 = float(det[3]) * h / 640.0
-            boxes.append(FaceBox(max(x1,0), max(y1,0), min(x2,w), min(y2,h), score))
+            boxes.append(FaceBox(
+                float(x1[i]) * scale_x,
+                float(y1[i]) * scale_y,
+                float(x2[i]) * scale_x,
+                float(y2[i]) * scale_y,
+                float(scores[i]),
+            ))
 
         return boxes
 
@@ -86,14 +137,17 @@ class FaceEngine:
             logger.error("face_recognition model not loaded")
             return np.zeros(256, dtype=np.float32)
 
+        # ArcFace 预处理: BGR→RGB, resize 112x112, (x/127.5 - 1.0)
         import cv2
         img = cv2.imdecode(np.frombuffer(face_crop, np.uint8), cv2.IMREAD_COLOR)
         if img is None:
-            return np.zeros(256, dtype=np.float32)
+            return np.zeros(512, dtype=np.float32)
         img = cv2.resize(img, (112, 112))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32)
+        img = (img / 127.5) - 1.0
         input_blob = np.ascontiguousarray(
-            img.transpose(2, 0, 1).astype(np.float32) / 255.0
-        )[np.newaxis, ...]  # (1, 3, 112, 112)
+            img.transpose(2, 0, 1)[np.newaxis, ...]
+        ).astype(np.float32)
 
         from mindx.sdk import Tensor
         input_tensor = Tensor(input_blob)
@@ -171,3 +225,56 @@ class FaceEngine:
             total_expected=len(face_lib.students),
             attempt=0,
         )
+
+
+# ---- PriorBox 生成 (RetinaFace MobileNet 0.25, input=640) ----
+
+def _generate_priors(img_w: int, img_h: int) -> "np.ndarray":
+    """生成 RetinaFace 的 anchor prior boxes，返回 (N, 4) [cx, cy, w, h]"""
+    steps = [8, 16, 32]
+    min_sizes = [[16, 32], [64, 128], [256, 512]]
+
+    priors = []
+    for step, min_s in zip(steps, min_sizes):
+        fm_w = img_w // step
+        fm_h = img_h // step
+        for y in range(fm_h):
+            cy = (y + 0.5) * step / img_w
+            for x in range(fm_w):
+                cx = (x + 0.5) * step / img_w
+                for s in min_s:
+                    priors.append([cx, cy, s / img_w, s / img_w])
+
+    return np.array(priors, dtype=np.float32)
+
+
+# ---- NMS ----
+
+def _nms(x1: "np.ndarray", y1: "np.ndarray", x2: "np.ndarray",
+         y2: "np.ndarray", scores: "np.ndarray",
+         iou_thresh: float = 0.4) -> "np.ndarray":
+    """返回保留的 index 列表"""
+    areas = (x2 - x1) * (y2 - y1)
+    order = scores.argsort()[::-1]
+    keep = []
+
+    while len(order) > 0:
+        i = order[0]
+        keep.append(i)
+        if len(order) == 1:
+            break
+
+        xx1 = np.maximum(x1[i], x1[order[1:]])
+        yy1 = np.maximum(y1[i], y1[order[1:]])
+        xx2 = np.minimum(x2[i], x2[order[1:]])
+        yy2 = np.minimum(y2[i], y2[order[1:]])
+
+        w = np.maximum(0.0, xx2 - xx1)
+        h = np.maximum(0.0, yy2 - yy1)
+        inter = w * h
+        iou = inter / (areas[i] + areas[order[1:]] - inter + 1e-8)
+
+        remain = np.where(iou <= iou_thresh)[0]
+        order = order[remain + 1]
+
+    return np.array(keep, dtype=np.intp)

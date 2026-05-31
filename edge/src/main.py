@@ -68,15 +68,21 @@ async def main():
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
+    # 项目根目录 (edge/)
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config_path = os.path.join(base_dir, "config", "edge_config.yaml")
     config = load_config(config_path)
     logger.info("Config loaded: %s", config_path)
 
-    # --- Step 1: DB ---
-    db_path = os.path.join(base_dir, "data", "edge.db")
+    # 路径：优先用 config 中的绝对路径，否则回退到项目相对路径
+    paths = config.get("paths", {})
+    db_path = paths.get("sqlite_db") or os.path.join(base_dir, "data", "edge.db")
+    schedule_path = paths.get("schedule") or os.path.join(base_dir, "config", "schedule.json")
+    face_lib_path = paths.get("face_lib") or os.path.join(base_dir, "data", "face_lib")
     schema_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                "db", "schema.sql")
+
+    # --- Step 1: DB ---
     db_conn = Connection(db_path, schema_path)
     conn = await db_conn.init()
     logger.info("SQLite initialized: %s", db_path)
@@ -116,7 +122,7 @@ async def main():
         logger.info("Models preloaded via MindX SDK")
 
     # --- Step 5: Face lib ---
-    face_lib = FaceLib(config["paths"]["face_lib"])
+    face_lib = FaceLib(face_lib_path)
     face_engine = FaceEngine(inference_svc)
     await face_lib.init(face_engine)
     logger.info("FaceLib initialized: %d students, %d embeddings",
@@ -156,9 +162,8 @@ async def main():
     # --- Step 8: MQTT subscriptions ---
     async def on_task_request(topic: str, payload: str):
         msg = json.loads(payload)
-        device_id = msg.get("device_id", "")
-        # person_count 走独立 topic，不经过这里
         task_type = msg.get("task_type", "")
+        # person_count 是推送数据流，走独立 topic，不经过调度引擎
         if task_type == "person_count":
             return
         await scheduler.handle_task_request(msg)
@@ -198,32 +203,56 @@ async def main():
                 qos=1,
             )
 
+    async def on_device_offline(topic: str, payload: str):
+        msg = json.loads(payload)
+        device_id = msg.get("device_id", "")
+        logger.warning("Device offline: %s (possible abnormal disconnect)", device_id)
+
     await mqtt.subscribe("edge/task/request/#", 1, on_task_request)
     await mqtt.subscribe("cloud/task/result/#", 1, on_cloud_result)
     await mqtt.subscribe("cloud/status/report", 0, on_cloud_status)
     await mqtt.subscribe("edge/status/person_count/#", 0, on_person_count)
     await mqtt.subscribe("edge/device/online/#", 1, on_device_online)
+    await mqtt.subscribe("edge/device/offline/#", 1, on_device_offline)
     logger.info("MQTT subscriptions set up")
 
     # --- Step 9: Schedule loader ---
-    schedule_loader = ScheduleLoader(config["paths"]["schedule"])
+    schedule_loader = ScheduleLoader(schedule_path)
     schedule_loader.load()
 
     schedule_loader.on_class_start(lambda entry: session_mgr.start_session(entry))
-    schedule_loader.on_class_end(lambda entry: None)  # end_session 由课表下课触发
+    async def on_class_end(entry: dict):
+        device = config["device_id"]
+        s = await session_repo.get_active(device)
+        if s:
+            await session_mgr.end_session(s.session_id)
+            # 下课触发报告生成
+            report_msg = {
+                "task_id": f"report_{s.session_id}",
+                "task_type": "report_generate",
+                "trigger_source": "system_timer",
+                "session_id": s.session_id,
+                "device_id": device,
+                "created_at": entry.get("end_time", ""),
+                "image": "",
+            }
+            await scheduler.handle_task_request(report_msg)
+            logger.info("Session ended: %s, report task created", s.session_id)
+
+    schedule_loader.on_class_end(on_class_end)
 
     async def periodic_checks():
-        """定时任务：检查课表下课、云端离线检测、本地队列消费。"""
+        """定时任务：本地队列异步消费、云端离线检测。"""
         while True:
-            # 本地队列消费
+            # 本地队列串行消费
             task = await task_mgr.dequeue_local()
             if task:
-                await scheduler.dispatch(task, "edge")
+                asyncio.create_task(scheduler._execute_local(task))
 
             # 云端离线检测
             await scheduler.check_cloud_offline()
 
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.1)
 
     asyncio.create_task(schedule_loader.start())
     asyncio.create_task(periodic_checks())

@@ -36,7 +36,7 @@ class MqttClient:
         self._sync_connect()
 
     def _sync_connect(self) -> None:
-        self.client.connect(self.broker_host, self.broker_port, keepalive=30)
+        self.client.connect_async(self.broker_host, self.broker_port, keepalive=30)
         self.client.loop_start()
 
     async def subscribe(self, topic: str, qos: int, handler: MessageHandler) -> None:

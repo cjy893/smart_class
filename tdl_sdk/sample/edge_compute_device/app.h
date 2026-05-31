@@ -57,7 +57,10 @@ private:
     std::chrono::steady_clock::time_point last_person_count_time_;
     std::chrono::steady_clock::time_point last_screenshot_time_;
     std::chrono::steady_clock::time_point last_reconnect_attempt_;
-    int reconnect_interval_seconds_ = 5;
+    std::chrono::steady_clock::time_point last_test_gpio_time_;
+    static constexpr int reconnect_interval_sec_ = 5;
+    static constexpr int test_gpio_interval_sec_ = 30;
+    int test_gpio_phase_ = 0;  // cycles 0→BTN_2_SHORT, 1→BTN_2_LONG, 2→BTN_3_SHORT
 
     // Current state.
     std::string current_session_id_;
@@ -73,7 +76,7 @@ private:
     // --- Initialization steps ---
     bool init_modules();
     bool connect_mqtt();
-    void try_reconnect_mqtt();
+    void publish_online();
     void setup_mqtt_subscriptions();
     void setup_http_callbacks();
     void setup_gpio_callbacks();
@@ -114,4 +117,6 @@ private:
 
     // --- Frame capture ---
     bool capture_screenshot_jpeg(VIDEO_FRAME_INFO_S& frame);
+    std::vector<uint8_t> encode_frame_to_jpeg(VIDEO_FRAME_INFO_S& frame);
+    static std::string base64_encode(const std::vector<uint8_t>& data);
 };

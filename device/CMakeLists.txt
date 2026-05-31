@@ -167,12 +167,8 @@ endif()
 
 set(EXTRA_LIBS "")
 
-if(PAHO_MQTT_FOUND)
-    set(EXTRA_LIBS ${EXTRA_LIBS} paho-mqtt3a)
-    message(STATUS "edge_compute_device: MQTT enabled")
-else()
-    message(FATAL_ERROR "paho.mqtt.c not found. Set -DPAHO_MQTT_URL=<url> or -DPAHO_MQTT_SOURCE_DIR=<path>")
-endif()
+# paho.mqtt.c no longer required — MQTT implemented via raw sockets.
+message(STATUS "edge_compute_device: MQTT via raw sockets (no paho dependency)")
 
 if(MICROHTTPD_FOUND)
     set(EXTRA_LIBS ${EXTRA_LIBS} microhttpd)

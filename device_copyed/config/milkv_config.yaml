@@ -1,0 +1,30 @@
+# Edge Compute Device Configuration
+# Format: key=value  (# for comments)
+# Falls back to hardcoded defaults for any missing keys.
+
+device_id=classroom-301
+
+mqtt_broker_host=192.168.1.100
+mqtt_broker_port=1883
+mqtt_keepalive_seconds=10
+
+person_count_interval_seconds=2
+
+web_server_port=8080
+
+camera_device=/dev/video0
+camera_width=640
+camera_height=480
+camera_screenshot_interval_seconds=1
+
+task_queue_depth=1
+task_debounce_ms=500
+task_long_press_ms=2000
+
+inference_model_path=/data/models/yolov5n.cvimodel
+inference_threshold=0.5
+inference_nms_threshold=0.5
+
+heartbeat_interval_seconds=5
+
+offline_cache_path=/tmp/offline_cache.jsonl

@@ -1,91 +1,72 @@
 # 端侧代码待完成项
 
+> 基于 2026-06-04 更新。实际代码路径 `tdl_sdk/sample/edge_compute_device/`。
+
 ## 已确认可工作
 
 - MMF 管线 (VI+ISP+VPSS) 初始化与清理
 - YOLOv8n 模型加载与 person_count 推理
-- MQTT 全部 topic 收发（8 个 topic，含 LWT）
-- MQTT 断连降级（进入 OFFLINE 状态，persist_count 本地缓存）
-- MQTT 自动重连（5s 间隔，flush 离线缓存，重订阅）
+- MQTT raw socket 实现（去除 paho.mqtt.c 依赖，避免 musl 线程兼容性问题）
+- MQTT 全部 topic 收发（9 个 topic，含 LWT + edge offline，QoS 0/1）
+- MQTT 断连降级（进入 OFFLINE 状态，person_count 本地缓存）
+- MQTT 非阻塞 init（连接失败不退出，进入 OFFLINE，HTTP 照常启动）
+- MQTT 自动重连（run() 主循环 5s 间隔后台重试，重连成功 flush 离线缓存 + 重订阅）
 - 任务队列（FIFO 深度 1，person_count drop frame）
 - Session 恢复指令解析与执行
 - HTTP API 全部 7 个端点
 - Web UI 页面结构与自动刷新
 - 策略切换 (BTN_1_SHORT) 与强制本地模式 (BTN_1_LONG)
 - 状态机全部 6 个状态及转换日志
-- Ctrl+C 信号处理与干净退出
+- Ctrl+C 信号处理与干净退出（无 segfault，MMF 资源正确释放）
+- Milk-V ↔ Atlas USB RNDIS 网络（静态 IP + 持久化 ARP + mosquitto 匿名访问）
+- JPEG 编码 + base64（OpenCV cv::imencode，参照 cvi_kit CVI_TDL_SavePicture 模式）
+- Edge 离线检测 + DEGRADED 降级
+- GPIO 按键启动 + 无硬件时的 30s 定时模拟测试
+- 开机自启动 (device/src/auto.sh → /mnt/data/auto.sh, S99user 自动调用)
 
 ---
 
-## 待完成项
+## 已修复
 
-### 1. GPIO 按键未启动
+### P0-1. 任务请求图像是假数据 ✓
+
+**文件**: `app.cpp`
+
+**修复内容**:
+- 新增 `encode_frame_to_jpeg()` — CVI_SYS_Mmap → cv::merge BGR planar → cv::imencode 内存 JPEG
+- 新增 `base64_encode()` — 标准 base64 编码器
+- `trigger_face_attendance()` 和 `trigger_behavior_analyze()` 改为真实 JPEG + base64
+
+### P0-2. GPIO 按键未启动 ✓
 
 **文件**: `app.cpp:init_modules()`
 
-`gpio_->start()` 从未被调用。`GpioHandler` 已初始化并注册回调，但轮询线程未启动，物理按键完全不工作。
+**修复内容**:
+- 在 `init_modules()` 末尾添加 `gpio_->start()`
 
-**修复**: 在 `init_modules()` 末尾添加 `gpio_->start()`。
+### P0-3. Edge 离线检测未实现 ✓
 
----
+**文件**: `app.cpp:setup_mqtt_subscriptions()`
 
-### 2. 任务请求图像是假数据
+**修复内容**:
+- 新增订阅 `edge/device/offline/{device_id}` (QoS 1)，收到后触发 `on_edge_offline()` → DEGRADED 降级
 
-**文件**: `app.cpp:trigger_face_attendance()`, `trigger_behavior_analyze()`
-
-需求要求签到任务附带人脸裁剪图（base64），行为分析附带全帧（base64）。当前代码发送的是 `{"w":768,"h":432}` 元数据 JSON。
-
-**修复**: 从 VPSS 帧中提取图像数据并做 base64 编码（可用 TDL SDK 的 IVE 模块或软件编码）。若短期无法实现，至少需要标注此限制。
-
----
-
-### 3. 截图是 JSON 元数据而非 JPEG
+### P1-3. 截图是 JSON 非 JPEG ✓
 
 **文件**: `app.cpp:capture_screenshot_jpeg()`
 
-Web UI 用 `<img>` 标签请求 `/api/screenshot`，但收到的是 `{"width":768,"height":432}` 而非 JPEG 二进制。
-
-**修复**: 从 VPSS 帧生成 JPEG（IVE JPEG encoder 或 stb_image_write）。
-
----
-
-### 4. 心跳负载值硬编码
-
-**文件**: `app.cpp:init_modules()` → `heartbeat_->on_load_query(...)`
-
-CPU 45.0、NPU 30.0、内存 128 是写死的常量，不是真实系统负载。
-
-**修复**: 读取 `/proc/stat` 计算 CPU 使用率，读取 `/sys/class/npu/` 或相关接口获取 NPU 负载，读取 `/proc/meminfo` 获取内存使用。
+**修复内容**:
+- 改为调用 `encode_frame_to_jpeg()`，与 P0-1 共用同一 JPEG 编码方案
 
 ---
 
-### 5. 心跳 status 字段未反映离线/降级
+## P2 — 精度与细节
 
-**文件**: `heartbeat.cpp:build_heartbeat_json()`
-
-`"status":"online"` 是硬编码。当端侧进入 OFFLINE 或 DEGRADED 状态时心跳仍报 online。注意：心跳本身在离线时无法送达（MQTT 断连），但 DEGRADED 状态下仍可送达。
-
-**修复**: 心跳接收 App 状态或提供 `set_status()` 接口，在 DEGRADED 时报 `"degraded"`。
-
----
-
-### 6. Edge 离线检测未实现
-
-**文件**: `app.cpp:run()`
-
-`on_edge_offline()` / `on_edge_online()` 已定义但无任何机制触发。需求规定边侧心跳 15s 超时判离线 → 端侧应退化为纯本地模式 (DEGRADED)。
-
-**修复**: 端侧需订阅边侧状态或通过 MQTT 心跳超时检测（边侧断连时 MQTT Broker 发布 LWT 到 `edge/device/offline/{edge_id}`，端侧订阅此 topic 即可感知）。
-
----
-
-### 7. GET / 不返回 Web 页面
-
-**文件**: `http_server.cpp:handle_get()`
-
-`GET /` 返回字符串 `"text/html placeholder"` 而非 `web/index.html` 的内容。
-
-**修复**: 读取 `web/index.html` 文件内容并通过 MHD 返回，或将 HTML 编译进二进制（嵌入式常用做法）。
+| # | 项 | 代码位置 | 说明 |
+|---|---|---|---|
+| 5 | 心跳负载值硬编码 | `app.cpp:75-77` lambda 返回 `45.0, 30.0, 128` | 需读 `/proc/stat`、`/proc/meminfo` |
+| 6 | 心跳 status 硬编码 | `heartbeat.cpp:86` 写死 `"online"` | DEGRADED 时仍报 online |
+| 7 | GET / 不返回 Web 页面 | `http_server.cpp:145` 返回 `"text/html placeholder"` | 需读 `web/index.html` 文件并返回 |
 
 ---
 

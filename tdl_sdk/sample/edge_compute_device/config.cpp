@@ -60,7 +60,7 @@ DeviceConfig load_config(const std::string& path) {
 
     // Hardcoded defaults (embedded device — no yaml-cpp available).
     cfg.device_id = "classroom-301";
-    cfg.mqtt.broker_host = "192.168.1.100";
+    cfg.mqtt.broker_host = "192.168.42.100";
     cfg.mqtt.broker_port = 1883;
     cfg.mqtt.keepalive_seconds = 10;
     cfg.person_count.interval_seconds = 2;

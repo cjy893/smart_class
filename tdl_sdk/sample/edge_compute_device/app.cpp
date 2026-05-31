@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <cstring>
+#include <opencv2/opencv.hpp>
 
 App::~App() { shutdown(); }
 
@@ -23,29 +24,21 @@ bool App::init(const std::string& config_path) {
     setup_http_callbacks();
     setup_gpio_callbacks();
 
-    // Try MQTT — failure is non-fatal. App starts in OFFLINE and retries.
     if (connect_mqtt()) {
         setup_mqtt_subscriptions();
+        publish_online();
         set_state(DeviceState::ONLINE);
-        uint64_t now_ms = unix_ms();
-        std::ostringstream oss;
-        oss << "{\"device_id\":\"" << config_.device_id << "\","
-            << "\"timestamp\":" << now_ms << ","
-            << "\"status\":\"online\"}";
-        mqtt_->publish("edge/device/online/" + config_.device_id, oss.str(), 1);
     } else {
-        std::cerr << "[App] MQTT unavailable, starting in offline mode" << std::endl;
         set_state(DeviceState::OFFLINE);
-        http_->set_network_status("offline");
-        http_->set_error_message("网络连接已断开，等待重连...");
+        std::cout << "[App] MQTT unavailable, starting in offline mode" << std::endl;
     }
 
-    // Start background services.
+    // Start background services (HTTP always starts regardless of MQTT state).
     heartbeat_->start();
     http_->start(config_.web_server.port);
 
-    last_reconnect_attempt_ = std::chrono::steady_clock::now();
     running_ = true;
+    last_reconnect_attempt_ = std::chrono::steady_clock::now();
     std::cout << "[App] Initialization complete, entering main loop" << std::endl;
     return true;
 }
@@ -84,6 +77,8 @@ bool App::init_modules() {
         cpu = 45.0f; npu = 30.0f; memory_mb = 128;
     });
 
+    gpio_->start();
+
     return true;
 }
 
@@ -102,39 +97,13 @@ bool App::connect_mqtt() {
                           config_.mqtt.keepalive_seconds);
 }
 
-void App::try_reconnect_mqtt() {
-    std::cout << "[App] Attempting MQTT reconnection..." << std::endl;
-
-    // Clean up any previous (failed) connection state.
-    mqtt_->disconnect();
-
-    if (!connect_mqtt()) {
-        std::cerr << "[App] Reconnection failed, will retry in "
-                  << reconnect_interval_seconds_ << "s" << std::endl;
-        return;
-    }
-
-    setup_mqtt_subscriptions();
-
-    // Flush offline cache.
-    auto records = offline_cache_->read_all();
-    for (const auto& rec : records) {
-        mqtt_->publish("edge/status/person_count/" + config_.device_id, rec, 0);
-    }
-    offline_cache_->clear();
-
-    // Publish online announcement.
+void App::publish_online() {
     uint64_t now_ms = unix_ms();
     std::ostringstream oss;
     oss << "{\"device_id\":\"" << config_.device_id << "\","
         << "\"timestamp\":" << now_ms << ","
         << "\"status\":\"online\"}";
     mqtt_->publish("edge/device/online/" + config_.device_id, oss.str(), 1);
-
-    set_state(DeviceState::ONLINE);
-    http_->set_network_status("online");
-    http_->set_error_message("");
-    std::cout << "[App] MQTT reconnection successful." << std::endl;
 }
 
 void App::setup_mqtt_subscriptions() {
@@ -149,6 +118,10 @@ void App::setup_mqtt_subscriptions() {
     mqtt_->subscribe("edge/schedule/command/" + config_.device_id, 1,
         [this](const std::string& topic, const std::string& payload) {
             on_schedule_command(topic, payload);
+        });
+    mqtt_->subscribe("edge/device/offline/" + config_.device_id, 1,
+        [this](const std::string& topic, const std::string& payload) {
+            on_edge_offline();
         });
 }
 
@@ -174,14 +147,13 @@ void App::setup_gpio_callbacks() {
 void App::run() {
     last_person_count_time_ = std::chrono::steady_clock::now();
     last_screenshot_time_ = std::chrono::steady_clock::now();
-    last_reconnect_attempt_ = std::chrono::steady_clock::now();
+    last_test_gpio_time_ = std::chrono::steady_clock::now();
 
     while (running_) {
         auto now = std::chrono::steady_clock::now();
 
-        // Person count loop (runs even when offline — local inference only).
-        if (state_ == DeviceState::ACTIVE || state_ == DeviceState::DEGRADED ||
-            (state_ == DeviceState::OFFLINE && !current_session_id_.empty())) {
+        // Person count loop (only during active session).
+        if (state_ == DeviceState::ACTIVE) {
             auto elapsed_pc = std::chrono::duration_cast<std::chrono::seconds>(
                 now - last_person_count_time_).count();
             if (elapsed_pc >= config_.person_count.interval_seconds) {
@@ -191,7 +163,8 @@ void App::run() {
         }
 
         // Screenshot loop.
-        if (state_ != DeviceState::INIT && state_ != DeviceState::CONNECTING) {
+        if (state_ == DeviceState::ACTIVE || state_ == DeviceState::IDLE ||
+            state_ == DeviceState::DEGRADED) {
             auto elapsed_ss = std::chrono::duration_cast<std::chrono::seconds>(
                 now - last_screenshot_time_).count();
             if (elapsed_ss >= config_.camera.screenshot_interval_seconds) {
@@ -200,20 +173,46 @@ void App::run() {
             }
         }
 
-        // MQTT reconnection when offline.
-        if (state_ == DeviceState::OFFLINE) {
-            auto elapsed_rc = std::chrono::duration_cast<std::chrono::seconds>(
-                now - last_reconnect_attempt_).count();
-            if (elapsed_rc >= reconnect_interval_seconds_) {
-                try_reconnect_mqtt();
-                last_reconnect_attempt_ = now;
+        // Test GPIO: periodically simulate button presses when no hardware is attached.
+        if (state_ == DeviceState::ACTIVE) {
+            auto elapsed_test = std::chrono::duration_cast<std::chrono::seconds>(
+                now - last_test_gpio_time_).count();
+            if (elapsed_test >= test_gpio_interval_sec_) {
+                last_test_gpio_time_ = now;
+                switch (test_gpio_phase_) {
+                    case 0: on_gpio_event(GpioHandler::Event::BTN_2_SHORT); break;
+                    case 1: on_gpio_event(GpioHandler::Event::BTN_2_LONG);  break;
+                    case 2: on_gpio_event(GpioHandler::Event::BTN_3_SHORT); break;
+                }
+                test_gpio_phase_ = (test_gpio_phase_ + 1) % 3;
             }
         }
 
-        // Connection lost detection.
+        // Connection monitoring: detect loss → go offline.
         if (!mqtt_->is_connected() && state_ != DeviceState::OFFLINE &&
-            state_ != DeviceState::INIT && state_ != DeviceState::CONNECTING) {
+            state_ != DeviceState::CONNECTING) {
             on_network_offline();
+        }
+
+        // Background reconnection: when offline, periodically retry (non-blocking).
+        if (state_ == DeviceState::OFFLINE || state_ == DeviceState::CONNECTING) {
+            auto elapsed_reconn = std::chrono::duration_cast<std::chrono::seconds>(
+                now - last_reconnect_attempt_).count();
+            if (!mqtt_->is_connected() && elapsed_reconn >= reconnect_interval_sec_) {
+                std::cout << "[App] Attempting MQTT reconnection..." << std::endl;
+                last_reconnect_attempt_ = now;
+                if (connect_mqtt()) {
+                    setup_mqtt_subscriptions();
+                    std::cout << "[App] Reconnection successful" << std::endl;
+                    on_network_online();
+                } else {
+                    std::cout << "[App] Reconnection failed, will retry in "
+                              << reconnect_interval_sec_ << "s" << std::endl;
+                    if (state_ == DeviceState::CONNECTING) {
+                        set_state(DeviceState::OFFLINE);
+                    }
+                }
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -232,18 +231,8 @@ void App::shutdown() {
 // --- Frame capture helper ---
 
 bool App::capture_screenshot_jpeg(VIDEO_FRAME_INFO_S& frame) {
-    // Get a frame and encode a small JPEG from the center region.
-    // For simplicity, store raw dimensions — full JPEG encoding
-    // requires IVE or software encoder. In v1, we send frame metadata.
-    last_screenshot_jpeg_.clear();
-
-    // Store frame metadata as placeholder screenshot.
-    std::ostringstream oss;
-    oss << "{\"width\":" << frame.stVFrame.u32Width
-        << ",\"height\":" << frame.stVFrame.u32Height << "}";
-    std::string meta = oss.str();
-    last_screenshot_jpeg_.assign(meta.begin(), meta.end());
-    return true;
+    last_screenshot_jpeg_ = encode_frame_to_jpeg(frame);
+    return !last_screenshot_jpeg_.empty();
 }
 
 // --- MQTT Handlers ---
@@ -370,15 +359,12 @@ void App::trigger_face_attendance() {
     req.device_id = config_.device_id;
     req.created_at = iso8601_now();
 
-    // Capture a frame from MMF for the task image.
+    // Capture a frame from MMF, encode to JPEG, base64.
     VIDEO_FRAME_INFO_S frame;
     memset(&frame, 0, sizeof(frame));
     if (mmf_->get_frame(frame, 2000)) {
-        // Encode frame metadata as base64 placeholder (real encoding needs IVE).
-        std::ostringstream meta;
-        meta << "{\"w\":" << frame.stVFrame.u32Width
-             << ",\"h\":" << frame.stVFrame.u32Height << "}";
-        req.image_base64 = meta.str();
+        std::vector<uint8_t> jpeg = encode_frame_to_jpeg(frame);
+        req.image_base64 = base64_encode(jpeg);
         mmf_->release_frame(frame);
     }
 
@@ -410,10 +396,8 @@ void App::trigger_behavior_analyze() {
     VIDEO_FRAME_INFO_S frame;
     memset(&frame, 0, sizeof(frame));
     if (mmf_->get_frame(frame, 2000)) {
-        std::ostringstream meta;
-        meta << "{\"w\":" << frame.stVFrame.u32Width
-             << ",\"h\":" << frame.stVFrame.u32Height << "}";
-        req.image_base64 = meta.str();
+        std::vector<uint8_t> jpeg = encode_frame_to_jpeg(frame);
+        req.image_base64 = base64_encode(jpeg);
         mmf_->release_frame(frame);
     }
 
@@ -573,6 +557,61 @@ void App::on_network_online() {
     mqtt_->publish("edge/device/online/" + config_.device_id, oss.str(), 1);
 
     on_online();
+}
+
+std::string App::base64_encode(const std::vector<uint8_t>& data) {
+    static const char kChars[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string result;
+    result.reserve(((data.size() + 2) / 3) * 4);
+    for (size_t i = 0; i < data.size(); i += 3) {
+        uint32_t n = static_cast<uint32_t>(data[i]) << 16;
+        if (i + 1 < data.size()) n |= static_cast<uint32_t>(data[i + 1]) << 8;
+        if (i + 2 < data.size()) n |= static_cast<uint32_t>(data[i + 2]);
+        result.push_back(kChars[(n >> 18) & 0x3F]);
+        result.push_back(kChars[(n >> 12) & 0x3F]);
+        result.push_back((i + 1 < data.size()) ? kChars[(n >> 6) & 0x3F] : '=');
+        result.push_back((i + 2 < data.size()) ? kChars[n & 0x3F] : '=');
+    }
+    return result;
+}
+
+std::vector<uint8_t> App::encode_frame_to_jpeg(VIDEO_FRAME_INFO_S& frame) {
+    std::vector<uint8_t> jpeg;
+    CVI_U32 height = frame.stVFrame.u32Height;
+    CVI_U32 width = frame.stVFrame.u32Width;
+
+    // Map the 3 BGR-planar planes.  Pattern follows CVI_TDL_SavePicture in cvi_kit.
+    CVI_U8* r_plane = (CVI_U8*)CVI_SYS_Mmap(frame.stVFrame.u64PhyAddr[0],
+                                              frame.stVFrame.u32Length[0]);
+    CVI_U8* g_plane = (CVI_U8*)CVI_SYS_Mmap(frame.stVFrame.u64PhyAddr[1],
+                                              frame.stVFrame.u32Length[1]);
+    CVI_U8* b_plane = (CVI_U8*)CVI_SYS_Mmap(frame.stVFrame.u64PhyAddr[2],
+                                              frame.stVFrame.u32Length[2]);
+    if (!r_plane || !g_plane || !b_plane) {
+        if (r_plane) CVI_SYS_Munmap((void*)r_plane, frame.stVFrame.u32Length[0]);
+        if (g_plane) CVI_SYS_Munmap((void*)g_plane, frame.stVFrame.u32Length[1]);
+        if (b_plane) CVI_SYS_Munmap((void*)b_plane, frame.stVFrame.u32Length[2]);
+        return jpeg;
+    }
+
+    // Merge BGR-planar → interleaved BGR Mat for OpenCV encoding.
+    cv::Mat r_mat(height, width, CV_8UC1, r_plane);
+    cv::Mat g_mat(height, width, CV_8UC1, g_plane);
+    cv::Mat b_mat(height, width, CV_8UC1, b_plane);
+    std::vector<cv::Mat> channels = {b_mat, g_mat, r_mat};  // BGR order
+    cv::Mat img_bgr;
+    cv::merge(channels, img_bgr);
+
+    // Encode to JPEG in memory.
+    std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 80};
+    cv::imencode(".jpg", img_bgr, jpeg, params);
+
+    CVI_SYS_Munmap((void*)r_plane, frame.stVFrame.u32Length[0]);
+    CVI_SYS_Munmap((void*)g_plane, frame.stVFrame.u32Length[1]);
+    CVI_SYS_Munmap((void*)b_plane, frame.stVFrame.u32Length[2]);
+
+    return jpeg;
 }
 
 // --- Helpers ---
