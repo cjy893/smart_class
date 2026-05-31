@@ -472,11 +472,11 @@ mqtt:
 grpc:
   listen_address: "0.0.0.0:50051"
 paths:
-  models: "/data/models"
-  reports: "/mnt/e/edge_compute/cloud/data/reports"
+  models: "../data/models"
+  reports: "../data/reports"
 behavior:
   use_rule_engine: true
-  model_path: "/data/models/yolov5m.onnx"
+  model_path: "../data/models/yolov5m.onnx"
 status_report:
   interval_seconds: 30
 ```

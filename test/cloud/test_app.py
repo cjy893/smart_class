@@ -193,3 +193,20 @@ def test_app_starts_report_http_server_before_status_reporter():
         "http.start",
         "status.start",
     ]
+
+
+def test_default_status_reporter_uses_cloud_task_handler_for_queue_depth():
+    recorder = Recorder()
+    app = CloudApp(
+        config(),
+        mqtt=RecordingMqtt(recorder),
+        behavior_engine=FakeBehaviorEngine(),
+        report_generator=FakeReportGenerator(),
+        grpc_server=FakeGrpcServer(recorder),
+        http_server=FakeHttpServer(recorder),
+        model_loader=FakeModelLoader(recorder),
+    )
+
+    run(app.start())
+
+    assert app.status_reporter.task_queue is app.task_handler
