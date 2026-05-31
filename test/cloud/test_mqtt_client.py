@@ -62,7 +62,7 @@ def test_mqtt_reconnect_restores_pending_subscriptions(monkeypatch):
             return fake_client
 
     monkeypatch.setattr(mqtt_client, "mqtt", FakeMqttModule)
-    client = MqttClient("127.0.0.1", 1883, "cloud-main")
+    client = MqttClient("192.168.137.2", 1883, "cloud-main")
 
     async def handler(topic, payload):
         return None
@@ -87,7 +87,7 @@ def test_mqtt_dispatches_wildcard_messages(monkeypatch):
 
     async def scenario():
         seen = []
-        client = MqttClient("127.0.0.1", 1883, "cloud-main")
+        client = MqttClient("192.168.137.2", 1883, "cloud-main")
         client._loop = asyncio.get_running_loop()
 
         async def handler(topic, payload):

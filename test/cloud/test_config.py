@@ -36,7 +36,7 @@ http:
     config = load_config(config_path)
 
     assert config.cloud_id == "cloud-main"
-    assert config.mqtt.broker_host == "192.168.1.100"
+    assert config.mqtt.broker_host == "192.168.137.2"
     assert config.mqtt.broker_port == 1883
     assert config.grpc.listen_address == "0.0.0.0:50051"
     assert config.paths.models == "/data/models"
@@ -102,7 +102,7 @@ def test_resolves_relative_cloud_paths_from_config_directory(tmp_path):
         """
 cloud_id: cloud-main
 mqtt:
-  broker_host: 127.0.0.1
+  broker_host: 192.168.137.2
   broker_port: 1883
 grpc:
   listen_address: 0.0.0.0:50051

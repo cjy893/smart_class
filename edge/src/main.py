@@ -188,9 +188,9 @@ async def main():
     async def on_device_online(topic: str, payload: str):
         msg = json.loads(payload)
         device_id = msg.get("device_id", "")
-        logger.info("Device online: %s", device_id)
-        # 若有活跃 session 则下发恢复指令
+        logger.info("Device online: %s (looking for active session)", device_id)
         s = await session_repo.get_active(device_id)
+        logger.info("Active session for %s: %s", device_id, s.session_id if s else "NONE")
         if s:
             cmd = {
                 "command": "session_restore",
@@ -202,6 +202,7 @@ async def main():
                 json.dumps(cmd),
                 qos=1,
             )
+            logger.info("session_restore sent to %s", device_id)
 
     async def on_device_offline(topic: str, payload: str):
         msg = json.loads(payload)

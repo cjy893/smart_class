@@ -65,7 +65,7 @@ def test_run_check_returns_zero_when_doctor_passes(tmp_path, capsys):
         f"""
 cloud_id: cloud-main
 mqtt:
-  broker_host: 127.0.0.1
+  broker_host: 192.168.137.2
   broker_port: 1883
 grpc:
   listen_address: 0.0.0.0:50051
@@ -90,7 +90,7 @@ def test_run_check_returns_nonzero_when_doctor_fails(tmp_path, capsys):
         f"""
 cloud_id: cloud-main
 mqtt:
-  broker_host: 127.0.0.1
+  broker_host: 192.168.137.2
   broker_port: 1883
 grpc:
   listen_address: 0.0.0.0:50051

@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import edge_report_pb2 as edge__report__pb2
+from proto import edge_report_pb2 as edge__report__pb2
 
 GRPC_GENERATED_VERSION = '1.80.0'
 GRPC_VERSION = grpc.__version__

@@ -71,7 +71,7 @@ def test_mqtt_dispatches_wildcard_messages(monkeypatch):
 
     async def scenario():
         seen = []
-        client = MqttClient("127.0.0.1", 1883, "edge-atlas-01")
+        client = MqttClient("192.168.137.2", 1883, "edge-atlas-01")
         client._loop = asyncio.get_running_loop()
 
         async def handler(topic, payload):
@@ -97,12 +97,12 @@ def test_pending_subscriptions_are_instance_scoped(monkeypatch):
     async def handler(topic, payload):
         return None
 
-    first = MqttClient("127.0.0.1", 1883, "edge-first")
+    first = MqttClient("192.168.137.2", 1883, "edge-first")
     run(first.subscribe("edge/task/request/#", 1, handler))
 
     second_fake = FakePahoClient()
     install_fake_paho(monkeypatch, second_fake)
-    second = MqttClient("127.0.0.1", 1883, "edge-second")
+    second = MqttClient("192.168.137.2", 1883, "edge-second")
     second._on_connect(second_fake, None, None, 0)
 
     assert second_fake.subscriptions == []
@@ -115,7 +115,7 @@ def test_reconnect_restores_client_subscriptions(monkeypatch):
     async def handler(topic, payload):
         return None
 
-    client = MqttClient("127.0.0.1", 1883, "edge-atlas-01")
+    client = MqttClient("192.168.137.2", 1883, "edge-atlas-01")
     run(client.subscribe("cloud/task/result/#", 1, handler))
     run(client.connect())
 

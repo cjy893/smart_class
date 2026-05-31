@@ -1,38 +1,16 @@
-(base) HwHiAiUser@davinci-mini:~/edge_compute/edge/src$ python main.py
-2026-05-28 20:53:39,141 [INFO] __main__: Config loaded: /home/HwHiAiUser/edge_compute/edge/config/edge_config.yaml
-2026-05-28 20:53:39,241 [INFO] __main__: SQLite initialized: /home/HwHiAiUser/edge_compute/edge/data/edge.db
-2026-05-28 20:53:39,252 [INFO] __main__: MQTT connected
-2026-05-28 20:53:39,253 [INFO] mqtt_client: MQTT connected to localhost:1883
-2026-05-28 20:53:39,253 [INFO] __main__: Recovered 0 active sessions
-2026-05-28 20:53:39,254 [WARNING] inference.inference_service: MindX SDK set_env.sh not found at /home/HwHiAiUser/Ascend/mxVision/set_env.sh, assuming PATH is pre-configured
-Begin to initialize Log.
-The output directory of logs file exist.
-WARNING: Logging before InitGoogleLogging() is written to STDERR
-I20260528 20:53:39.661972 138058 FileUtils.cpp:331] The input file is empty
-I20260528 20:53:39.662165 138058 FileUtils.cpp:475] Check Other group permission: Current permission is 4, but required no greater than 0.
-Save logs information to specified directory.
-2026-05-28 20:53:41,185 [INFO] inference.inference_service: Model loaded: face_detection → /home/HwHiAiUser/edge_compute/edge/models/retinaface.om
-2026-05-28 20:53:41,354 [INFO] inference.inference_service: Model loaded: face_recognition → /home/HwHiAiUser/edge_compute/edge/models/arcface.om
-2026-05-28 20:53:41,851 [INFO] inference.inference_service: Model loaded: behavior → /home/HwHiAiUser/edge_compute/edge/models/yolov5m.om
-2026-05-28 20:53:41,857 [INFO] inference.inference_service: InferenceService initialized, 3 models loaded
-2026-05-28 20:53:41,857 [INFO] __main__: Models preloaded via MindX SDK
-2026-05-28 20:53:41,871 [INFO] face_lib: FaceLib: photos changed, rebuilding embeddings...
-2026-05-28 20:53:41,872 [INFO] face_lib: FaceLib roster loaded: 2 students
-2026-05-28 20:53:42,347 [INFO] face_lib: Embedding built: 张三 (2024001)
-2026-05-28 20:53:42,347 [WARNING] face_lib: Photo not found: /home/HwHiAiUser/edge_compute/edge/data/face_lib/photos/李四.jpg
-2026-05-28 20:53:42,362 [INFO] __main__: FaceLib initialized: 2 students, 1 embeddings
-2026-05-28 20:53:42,362 [INFO] __main__: Scheduler initialized, policy=adaptive
-2026-05-28 20:53:42,369 [INFO] __main__: MQTT subscriptions set up
-2026-05-28 20:53:42,370 [INFO] schedule_loader: Schedule loaded: 1 entries
-2026-05-28 20:53:42,370 [INFO] __main__: ScheduleLoader and periodic checks started
-2026-05-28 20:53:42,619 [INFO] __main__: Starting API server on 0.0.0.0:8000
-INFO:     Started server process [138055]
-INFO:     Waiting for application startup.
-2026-05-28 20:53:42,685 [INFO] schedule_loader: ScheduleLoader started, active sessions: 0
-2026-05-28 20:53:42,686 [INFO] grpc_client: GrpcClient started, reporting to 192.168.137.2:50051 every 30s
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-^[[B^CINFO:     Shutting down
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
-INFO:     Finished server process [138055]
+1780276982: New client connected from 192.168.42.1:60606 as auto-36E0671E-024F-BD6A-A533-810C87AAF12B (p2, c1, k10).
+1780276987: Client auto-36E0671E-024F-BD6A-A533-810C87AAF12B disconnected due to malformed packet.
+1780276987: New connection from 192.168.42.1:60608 on port 1883.
+1780276987: New client connected from 192.168.42.1:60608 as auto-194CA2AB-2C0D-8A97-ABAA-DB90DF3875A5 (p2, c1, k10).
+1780276992: Client auto-194CA2AB-2C0D-8A97-ABAA-DB90DF3875A5 disconnected due to malformed packet.
+1780276992: New connection from 192.168.42.1:60610 on port 1883.
+1780276992: New client connected from 192.168.42.1:60610 as auto-457621DA-8894-1EC1-210A-99D60F17C219 (p2, c1, k10).
+1780276997: Client auto-457621DA-8894-1EC1-210A-99D60F17C219 disconnected due to malformed packet.
+1780276997: New connection from 192.168.42.1:60612 on port 1883.
+1780276997: New client connected from 192.168.42.1:60612 as auto-BC7F4E07-9DE3-437C-E389-8534C2CFF54E (p2, c1, k10).
+1780277002: Client auto-BC7F4E07-9DE3-437C-E389-8534C2CFF54E disconnected due to malformed packet.
+1780277002: New connection from 192.168.42.1:60614 on port 1883.
+1780277002: New client connected from 192.168.42.1:60614 as auto-48695223-29F0-6A0E-6070-E52346A47519 (p2, c1, k10).
+1780277007: Client auto-48695223-29F0-6A0E-6070-E52346A47519 disconnected due to malformed packet.
+1780277008: New connection from 192.168.42.1:60616 on port 1883.
+1780277008: New client connected from 192.168.42.1:60616 as auto-9180E7AC-95E5-15EB-F96B-6165D1AF70CD (p2, c1, k10).

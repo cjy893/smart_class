@@ -9,7 +9,7 @@ def config(tmp_path: Path) -> CloudConfig:
     reports_dir = tmp_path / "reports"
     return CloudConfig(
         cloud_id="cloud-main",
-        mqtt=MqttConfig("127.0.0.1", 1883),
+        mqtt=MqttConfig("192.168.137.2", 1883),
         grpc=GrpcConfig("0.0.0.0:50051"),
         paths=PathsConfig(str(model_dir), str(reports_dir)),
         behavior=BehaviorConfig(True, str(model_dir / "yolov5m.onnx")),

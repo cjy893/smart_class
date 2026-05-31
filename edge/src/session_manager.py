@@ -28,8 +28,16 @@ class SessionManager:
 
         existing = await self.session_repo.get_active(device_id)
         if existing and existing.session_id == session_id:
-            logger.info("Session already active: %s", session_id)
+            logger.info("Session already active, re-sending restore: %s", session_id)
             self._active_sessions[device_id] = existing
+            # 重启恢复：即使 session 已存在，也要重新下发 session_restore
+            if self.mqtt:
+                cmd = (
+                    '{"command":"session_restore",'
+                    f'"session_id":"{session_id}",'
+                    '"policy":"adaptive"}'
+                )
+                await self.mqtt.publish(f"edge/schedule/command/{device_id}", cmd, qos=1)
             return existing
 
         s = Session(

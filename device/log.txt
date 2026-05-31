@@ -1,0 +1,96 @@
+[   17.061870] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+l[   18.074262] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   18.083702] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   18.090939] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   19.129807] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   19.138601] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   20.155133] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   20.163913] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   20.171144] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   21.209782] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   21.223473] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   22.236059] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   22.244840] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   22.252744] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   23.289809] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   23.298646] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   24.311301] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   24.320747] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   24.327987] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   25.369799] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   25.378969] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   26.395721] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   26.404497] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   26.411840] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   27.450999] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   27.459874] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   28.472350] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   28.481817] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   28.489052] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   29.529788] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   29.538684] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   30.554933] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   30.563709] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   30.570946] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   31.609794] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   31.624108] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   32.636858] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   32.646319] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   32.653556] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   33.689791] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   33.698629] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   34.716000] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   34.724784] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   34.732015] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   35.769780] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   35.782285] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   36.816016] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   36.824806] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   36.832040] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   37.849775] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   37.858631] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   38.874996] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   38.884505] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   38.891750] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   39.929783] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   39.940379] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   40.967870] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   40.977315] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   40.984553] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   42.012895] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   42.023388] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   43.049468] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   43.058245] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   43.065480] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   44.089782] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   44.098615] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   45.114859] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   45.123635] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   45.130868] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   46.169825] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   46.188262] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   47.201130] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   47.210579] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   47.217819] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   48.249791] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   48.260149] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   49.286825] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   49.295598] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   49.302834] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   50.329779] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   50.343780] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   51.366200] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   51.375640] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   51.382882] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   52.409797] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   52.418565] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   53.432752] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   53.442217] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   53.449456] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   54.489783] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   54.500159] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
+[   55.525687] vb_get_block_with_id:715(): required size(1228800) > pool(2)'s blk-size(995328).
+[   55.534469] fill_buffers:918(): Grp(1) Chn(0) Can't acquire VB BLK for VPSS
+[   55.542372] vpss_try_schedule_offline:2859(): grp(1) fill buffer NG.
+[   56.573606] base_get_chn_buffer:267(): Mod(VPSS) Grp(1) Chn(0), jobs wait(0) work(0) done(0)
+[   56.584100] vpss_get_chn_frame:4557(): Grp(1) Chn(0) get chn frame fail, s32MilliSec=1000, ret=-1
