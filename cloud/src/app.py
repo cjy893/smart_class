@@ -55,6 +55,11 @@ class CloudApp:
                 self.config.behavior.model_path,
                 use_rule_engine=self.config.behavior.use_rule_engine,
             )
+        self.task_handler = CloudTaskHandler(
+            self.mqtt,
+            self.behavior_engine,
+            self.report_generator,
+        )
         if self.status_reporter is None:
             self.status_reporter = StatusReporter(
                 self.config.cloud_id,
@@ -62,11 +67,6 @@ class CloudApp:
                 interval_seconds=self.config.status_report.interval_seconds,
                 task_queue=self.task_handler,
             )
-        self.task_handler = CloudTaskHandler(
-            self.mqtt,
-            self.behavior_engine,
-            self.report_generator,
-        )
 
         await self.mqtt.connect()
         await self.task_handler.start()

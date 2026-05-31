@@ -1,0 +1,4 @@
+models/*
+reports/*
+!models/.gitkeep
+!reports/.gitkeep

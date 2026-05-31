@@ -55,7 +55,9 @@ class CloudConfig:
 
 
 def load_config(path: str | Path) -> CloudConfig:
-    with open(path, encoding="utf-8") as f:
+    config_path = Path(path).resolve()
+    config_dir = config_path.parent
+    with open(config_path, encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
 
     return CloudConfig(
@@ -68,12 +70,12 @@ def load_config(path: str | Path) -> CloudConfig:
             listen_address=_required(raw, "grpc.listen_address"),
         ),
         paths=PathsConfig(
-            models=_required(raw, "paths.models"),
-            reports=_required(raw, "paths.reports"),
+            models=_resolve_config_path(config_dir, _required(raw, "paths.models")),
+            reports=_resolve_config_path(config_dir, _required(raw, "paths.reports")),
         ),
         behavior=BehaviorConfig(
             use_rule_engine=bool(_get(raw, "behavior.use_rule_engine", True)),
-            model_path=_required(raw, "behavior.model_path"),
+            model_path=_resolve_config_path(config_dir, _required(raw, "behavior.model_path")),
         ),
         status_report=StatusReportConfig(
             interval_seconds=int(_get(raw, "status_report.interval_seconds", 30)),
@@ -99,3 +101,10 @@ def _get(raw: dict[str, Any], dotted_key: str, default: Any) -> Any:
             return default
         current = current[part]
     return current
+
+
+def _resolve_config_path(config_dir: Path, value: Any) -> str:
+    path = Path(str(value))
+    if path.is_absolute():
+        return str(path)
+    return str((config_dir / path).resolve())

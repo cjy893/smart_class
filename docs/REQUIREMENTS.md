@@ -620,16 +620,23 @@ paths:
   models: "/data/models"
 
 # 云端配置示例 (cloud_config.yaml)
+cloud_id: "cloud-main"
 mqtt:
   broker_host: "192.168.1.100"
   broker_port: 1883
 grpc:
-  edge_address: "192.168.1.100:50051"
+  listen_address: "0.0.0.0:50051"
 paths:
-  models: "/data/models"
-  reports: "/data/reports"
+  models: "../data/models"
+  reports: "../data/reports"
 behavior:
   use_rule_engine: true
+  model_path: "../data/models/yolov5m.onnx"
+status_report:
+  interval_seconds: 30
+http:
+  host: "0.0.0.0"
+  port: 8081
 ```
 
 ## 14. 技术选型
